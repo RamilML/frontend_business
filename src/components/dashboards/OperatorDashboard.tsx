@@ -1,68 +1,163 @@
-import React from 'react';
-import { PackageCheck, Barcode, Box, Truck, CheckCircle2, Play } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shipment, CreateShipmentDto } from '../../types/shipment';
+import { ShipmentService } from '../../services/shipmentService';
+import { BarcodeScanScreen } from '../scanning/BarcodeScanScreen';
+import { NewShipmentModal } from '../scanning/NewShipmentModal';
+import {
+  PackageCheck,
+  Barcode,
+  Box,
+  Truck,
+  PlusCircle,
+  Play,
+  CheckCircle2,
+  Building2,
+  Clock
+} from 'lucide-react';
 
 export const OperatorDashboard: React.FC = () => {
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [activeShipmentId, setActiveShipmentId] = useState<string | null>(null);
+  const [isNewShipmentOpen, setIsNewShipmentOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadShipments = async () => {
+    setIsLoading(true);
+    try {
+      const data = await ShipmentService.getShipments();
+      setShipments(data);
+    } catch {
+      // Ignore
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadShipments();
+  }, []);
+
+  const handleCreateShipment = async (dto: CreateShipmentDto) => {
+    const created = await ShipmentService.createShipment(dto);
+    loadShipments();
+    setActiveShipmentId(created.id);
+  };
+
+  if (activeShipmentId) {
+    return (
+      <BarcodeScanScreen
+        shipmentId={activeShipmentId}
+        onBack={() => {
+          setActiveShipmentId(null);
+          loadShipments();
+        }}
+      />
+    );
+  }
+
   return (
     <div className="dashboard-container">
-      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Header Bar */}
+      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Рабочее место Оператора (ТСД)</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Приёмка товаров, сканирование штрихкодов и упаковка в коробки</p>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <PackageCheck color="#10b981" size={24} /> Рабочее место Оператора (ТСД)
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            Приёмка товаров по штрихкодам, скан-контроль и ручной учет на складе
+          </p>
         </div>
-        <button className="btn-primary" style={{ width: 'auto' }}>
-          <Play size={16} /> Начать сканирование поставки
+
+        <button className="btn-primary" onClick={() => setIsNewShipmentOpen(true)} style={{ width: 'auto' }}>
+          <PlusCircle size={18} /> Новая поставка
         </button>
       </div>
 
-      {/* Operator stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-            <span>Активная поставка</span>
-            <Box size={20} color="var(--primary)" />
-          </div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '0.5rem' }}>№ WB-2026-0805</div>
-          <span style={{ fontSize: '0.8rem', color: '#10b981' }}>Клиент: ООО "Модный Гардероб"</span>
-        </div>
-
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-            <span>Отсканировано ШК</span>
-            <Barcode size={20} color="#3b82f6" />
-          </div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '0.5rem' }}>148 / 200 шт.</div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Прогресс: 74%</span>
-        </div>
-
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-            <span>Сформировано коробок</span>
-            <Truck size={20} color="#8b5cf6" />
-          </div>
-          <div style={{ fontSize: '1.4rem', fontWeight: 700, marginTop: '0.5rem' }}>6 коробов</div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Склады: Коледино, Тула</span>
-        </div>
-      </div>
-
-      <div className="card">
+      {/* Active Shipments Table / Cards */}
+      <div className="card" style={{ marginBottom: '1.5rem' }}>
         <h3 className="card-title">
-          <PackageCheck size={18} color="#10b981" /> Ваше назначение и доступные действия
+          <Barcode size={18} color="var(--primary)" /> Активные поставки в приёмке
         </h3>
-        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-          Как <b>Оператор</b>, вы имеете доступ к сканированию штрихкодов, ручному выбору номеров коробок и привязке их к складам Wildberries.
-        </p>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn-secondary">
-            <Barcode size={16} /> Сканер ШК (Камера / ТСД)
-          </button>
-          <button className="btn-secondary">
-            <Box size={16} /> Распределение по коробкам
-          </button>
-          <button className="btn-secondary">
-            <CheckCircle2 size={16} /> Завершить смену
-          </button>
-        </div>
+
+        {isLoading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            Загрузка списка поставок...
+          </div>
+        ) : shipments.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            Нет активных поставок. Нажмите «Новая поставка», чтобы начать приёмку.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+            {shipments.map((shp) => {
+              const totalPlanned = shp.items.reduce((acc, it) => acc + it.plannedQuantity, 0);
+              const totalScanned = shp.items.reduce((acc, it) => acc + it.scannedQuantity, 0);
+              const percent = totalPlanned > 0 ? Math.round((totalScanned / totalPlanned) * 100) : 0;
+
+              return (
+                <div
+                  key={shp.id}
+                  style={{
+                    background: 'rgba(15, 23, 42, 0.6)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '1.25rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary)' }}>
+                        {shp.shipmentNumber}
+                      </span>
+                      <span className="badge badge-operator">
+                        {shp.status === 'receiving' ? 'В приёмке' : shp.status}
+                      </span>
+                    </div>
+
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Building2 size={14} /> Клиент: <b>{shp.clientName}</b>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                        <Truck size={14} /> Склады ВБ: {shp.targetWarehouses.join(', ')}
+                      </div>
+                    </div>
+
+                    {/* Progress */}
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                        <span>Отсканировано:</span>
+                        <b>{totalScanned} / {totalPlanned} шт. ({percent}%)</b>
+                      </div>
+                      <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 999 }}>
+                        <div style={{ width: `${percent}%`, height: '100%', background: 'var(--primary)', borderRadius: 999 }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    className="btn-primary"
+                    onClick={() => setActiveShipmentId(shp.id)}
+                    style={{ width: '100%' }}
+                  >
+                    <Play size={16} /> Начать / Продолжить сканирование
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {/* New Shipment Wizard Modal */}
+      <NewShipmentModal
+        isOpen={isNewShipmentOpen}
+        onClose={() => setIsNewShipmentOpen(false)}
+        onCreateShipment={handleCreateShipment}
+      />
     </div>
   );
 };

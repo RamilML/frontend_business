@@ -125,3 +125,55 @@
 * **HTTP Метод:** `DELETE`
 * **URL:** `/api/v1/clients/:id`
 
+---
+
+## 4. Эндпоинты поставок и Сканирования ШК (Приёмка)
+
+### 4.1 Список активных поставок
+* **HTTP Метод:** `GET`
+* **URL:** `/api/v1/shipments`
+* **Заголовки:** `Authorization: Bearer <accessToken>`
+
+### 4.2 Сканирование штрихкода (ТСД / Камера)
+* **HTTP Метод:** `POST`
+* **URL:** `/api/v1/shipments/:id/scan`
+* **Заголовки:** `Authorization: Bearer <accessToken>`
+* **Request Body:**
+```json
+{
+  "barcode": "4601234567890"
+}
+```
+
+#### Успешный ответ (Response 200 OK):
+```json
+{
+  "success": true,
+  "item": {
+    "id": "item_1",
+    "barcode": "4601234567890",
+    "sku": "FUT-BLK-M",
+    "title": "Футболка базовая оверсайз Черная M",
+    "plannedQuantity": 30,
+    "scannedQuantity": 25,
+    "lastScannedAt": "2026-08-05T15:30:00Z"
+  },
+  "message": "Отсканировано: Футболка базовая оверсайз Черная M (25/30 шт.)"
+}
+```
+
+#### Ошибка — Неизвестный ШК (Response 404 / 400):
+```json
+{
+  "success": false,
+  "message": "Штрихкод 4609999000111 не найден в плановом списке этой поставки.",
+  "isNewItem": true
+}
+```
+
+### 4.3 Корректировка количества товара вручную
+* **HTTP Метод:** `PUT`
+* **URL:** `/api/v1/shipments/:id/items/:itemId`
+* **Request Body:** `{ "scannedQuantity": 26 }`
+
+
