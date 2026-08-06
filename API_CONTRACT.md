@@ -176,4 +176,53 @@
 * **URL:** `/api/v1/shipments/:id/items/:itemId`
 * **Request Body:** `{ "scannedQuantity": 26 }`
 
+---
+
+## 5. Эндпоинты Упаковки в Коробки и Склады WB
+
+### 5.1 Добавление новой коробки
+* **HTTP Метод:** `POST`
+* **URL:** `/api/v1/shipments/:id/boxes`
+* **Request Body:**
+```json
+{
+  "targetWarehouse": "Коледино"
+}
+```
+
+### 5.2 Назначение склада Wildberries на коробку
+* **HTTP Метод:** `PUT`
+* **URL:** `/api/v1/shipments/:id/boxes/:boxNumber/warehouse`
+* **Request Body:**
+```json
+{
+  "targetWarehouse": "Электросталь"
+}
+```
+
+### 5.3 Упаковка товара в коробку
+* **HTTP Метод:** `POST`
+* **URL:** `/api/v1/shipments/:id/boxes/:boxNumber/pack`
+* **Request Body:**
+```json
+{
+  "itemId": "item_1",
+  "quantity": 5
+}
+```
+
+### 5.4 Перемещение товара между коробками
+* **HTTP Метод:** `POST`
+* **URL:** `/api/v1/shipments/:id/boxes/move`
+* **Request Body:**
+```json
+{
+  "fromBoxNumber": 1,
+  "toBoxNumber": 2,
+  "itemId": "item_1",
+  "quantity": 3
+}
+```
+
+
 

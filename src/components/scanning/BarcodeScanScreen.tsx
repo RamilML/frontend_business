@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Shipment, ShipmentItem, ScanResult } from '../../types/shipment';
 import { ShipmentService } from '../../services/shipmentService';
 import { CameraScannerModal } from './CameraScannerModal';
+import { PackingScreen } from '../packing/PackingScreen';
 import {
   Barcode,
   Camera,
@@ -16,6 +17,7 @@ import {
   Package,
   Layers,
   Truck,
+  Box,
   X
 } from 'lucide-react';
 
@@ -28,6 +30,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [isPackingView, setIsPackingView] = useState(false);
   
   // Flash feedback animation state ('success' | 'error' | null)
   const [flashType, setFlashType] = useState<'success' | 'error' | null>(null);
@@ -147,6 +150,18 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
     );
   }
 
+  if (isPackingView) {
+    return (
+      <PackingScreen
+        shipmentId={shipmentId}
+        onBack={() => {
+          setIsPackingView(false);
+          loadShipment();
+        }}
+      />
+    );
+  }
+
   // Calculate totals
   const totalPlanned = shipment.items.reduce((acc, it) => acc + it.plannedQuantity, 0);
   const totalScanned = shipment.items.reduce((acc, it) => acc + it.scannedQuantity, 0);
@@ -186,8 +201,15 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <button
               className="btn-secondary"
-              onClick={() => setIsCameraOpen(true)}
+              onClick={() => setIsPackingView(true)}
               style={{ borderColor: 'var(--primary)', color: 'var(--primary)' }}
+            >
+              <Box size={16} /> Упаковка в Коробки ({shipment.boxes.length})
+            </button>
+
+            <button
+              className="btn-secondary"
+              onClick={() => setIsCameraOpen(true)}
             >
               <Camera size={16} /> Камера Смартфона
             </button>

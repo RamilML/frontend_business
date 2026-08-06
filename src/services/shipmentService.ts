@@ -1,4 +1,4 @@
-import { Shipment, CreateShipmentDto, ShipmentItem, ScanResult } from '../types/shipment';
+import { Shipment, CreateShipmentDto, ShipmentItem, ScanResult, PackingBox, WBWarehouse } from '../types/shipment';
 import { AuthService } from './authService';
 import { audioSynth } from '../utils/audioSynth';
 
@@ -308,5 +308,148 @@ export class ShipmentService {
 
     this.saveStoredShipments(list);
     return item;
+  }
+
+  /**
+   * Добавление новой упаковчной коробки
+   */
+  public static async createBox(
+    shipmentId: string,
+    targetWarehouse: WBWarehouse
+  ): Promise<PackingBox> {
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    const nextBoxNumber = (shipment.boxes.length > 0 ? Math.max(...shipment.boxes.map((b) => b.boxNumber)) : 0) + 1;
+
+    const newBox: PackingBox = {
+      boxNumber: nextBoxNumber,
+      targetWarehouse,
+      items: []
+    };
+
+    shipment.boxes.push(newBox);
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+    return newBox;
+  }
+
+  /**
+   * Изменение целевого склада Wildberries для коробки
+   */
+  public static async updateBoxWarehouse(
+    shipmentId: string,
+    boxNumber: number,
+    targetWarehouse: WBWarehouse
+  ): Promise<PackingBox> {
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    const box = shipment.boxes.find((b) => b.boxNumber === boxNumber);
+    if (!box) throw new Error('Коробка не найдена');
+
+    box.targetWarehouse = targetWarehouse;
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+    return box;
+  }
+
+  /**
+   * Упаковка товара в выбранную коробку
+   */
+  public static async packItemToBox(
+    shipmentId: string,
+    boxNumber: number,
+    itemId: string,
+    quantity: number
+  ): Promise<Shipment> {
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    const box = shipment.boxes.find((b) => b.boxNumber === boxNumber);
+    if (!box) throw new Error('Коробка не найдена');
+
+    const item = shipment.items.find((it) => it.id === itemId);
+    if (!item) throw new Error('Товар не найден');
+
+    const existingInBox = box.items.find((bi) => bi.itemId === itemId);
+    if (existingInBox) {
+      existingInBox.quantity += quantity;
+    } else {
+      box.items.push({
+        itemId: item.id,
+        barcode: item.barcode,
+        title: item.title,
+        quantity
+      });
+    }
+
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+    return shipment;
+  }
+
+  /**
+   * Перемещение товара из одной коробки в другую
+   */
+  public static async moveItemBetweenBoxes(
+    shipmentId: string,
+    fromBoxNumber: number,
+    toBoxNumber: number,
+    itemId: string,
+    moveQuantity: number
+  ): Promise<Shipment> {
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    const fromBox = shipment.boxes.find((b) => b.boxNumber === fromBoxNumber);
+    const toBox = shipment.boxes.find((b) => b.boxNumber === toBoxNumber);
+    if (!fromBox || !toBox) throw new Error('Исходная или целевая коробка не найдена');
+
+    const itemInFrom = fromBox.items.find((bi) => bi.itemId === itemId);
+    if (!itemInFrom || itemInFrom.quantity < moveQuantity) {
+      throw new Error('Недостаточно товара в исходной коробке');
+    }
+
+    // Deduct from source box
+    itemInFrom.quantity -= moveQuantity;
+    if (itemInFrom.quantity <= 0) {
+      fromBox.items = fromBox.items.filter((bi) => bi.itemId !== itemId);
+    }
+
+    // Add to target box
+    const itemInTo = toBox.items.find((bi) => bi.itemId === itemId);
+    if (itemInTo) {
+      itemInTo.quantity += moveQuantity;
+    } else {
+      toBox.items.push({
+        itemId: itemInFrom.itemId,
+        barcode: itemInFrom.barcode,
+        title: itemInFrom.title,
+        quantity: moveQuantity
+      });
+    }
+
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+    return shipment;
+  }
+
+  /**
+   * Удаление пустой коробки
+   */
+  public static async deleteBox(shipmentId: string, boxNumber: number): Promise<Shipment> {
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    shipment.boxes = shipment.boxes.filter((b) => b.boxNumber !== boxNumber);
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+    return shipment;
   }
 }
