@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Client } from '../../types/client';
 import { ClientList } from '../clients/ClientList';
 import { ClientSelectModal } from '../clients/ClientSelectModal';
+import { ActListScreen } from '../acts/ActListScreen';
 import {
   ShieldCheck,
   Users,
@@ -13,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export const ManagerDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'acts'>('dashboard');
   const [isSelectClientModalOpen, setIsSelectClientModalOpen] = useState(false);
   const [selectedClientForShipment, setSelectedClientForShipment] = useState<Client | null>(null);
 
@@ -55,10 +56,23 @@ export const ManagerDashboard: React.FC = () => {
         >
           <Building2 size={15} /> Справочник Клиентов
         </button>
+
+        <button
+          className={`btn-secondary ${activeTab === 'acts' ? 'active' : ''}`}
+          onClick={() => setActiveTab('acts')}
+          style={{
+            borderColor: activeTab === 'acts' ? 'var(--primary)' : 'var(--border)',
+            color: activeTab === 'acts' ? 'var(--primary)' : 'var(--text-muted)'
+          }}
+        >
+          <FileText size={15} /> Акты выполненных работ (13 услуг)
+        </button>
       </div>
 
       {activeTab === 'clients' ? (
         <ClientList onSelectClientForShipment={handleStartShipment} />
+      ) : activeTab === 'acts' ? (
+        <ActListScreen />
       ) : (
         <div className="dashboard-container">
           <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -69,8 +83,8 @@ export const ManagerDashboard: React.FC = () => {
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn-secondary" onClick={() => setActiveTab('clients')}>
-                <Building2 size={16} /> Карточки Клиентов
+              <button className="btn-secondary" onClick={() => setActiveTab('acts')}>
+                <FileText size={16} /> Создать Акт (13 услуг)
               </button>
               <button 
                 className="btn-primary" 
@@ -101,7 +115,7 @@ export const ManagerDashboard: React.FC = () => {
                 <Users size={20} color="#3b82f6" />
               </div>
               <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>3 контрагента</div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>Нажмите для просмотра карточек $\rightarrow$</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>Перейти к справочнику $\rightarrow$</span>
             </div>
 
             <div className="card">
@@ -112,28 +126,29 @@ export const ManagerDashboard: React.FC = () => {
               <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>6 поставок</div>
             </div>
 
-            <div className="card">
+            <div className="card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('acts')}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                 <span>Сформировано Актов</span>
                 <FileText size={20} color="#10b981" />
               </div>
               <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>27 актов</div>
+              <span style={{ fontSize: '0.75rem', color: '#10b981' }}>Открыть реестр актов $\rightarrow$</span>
             </div>
           </div>
 
           <div className="card">
             <h3 className="card-title">
-              <ShieldCheck size={18} color="#3b82f6" /> Модуль управления Клиентами (Контрагентами)
+              <ShieldCheck size={18} color="#3b82f6" /> Интерактивный генератор Акта выполненных работ (п. 11 ТЗ)
             </h3>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Перед каждой новой поставкой операторы или менеджеры выбирают клиента из справочника либо создают нового. Все реквизиты (ИНН, Юр. адрес, Расчетный счет) сохраняются для автоматического формирования Актов выполненных работ.
+              При создании акта выбираются выполнённые услуги из 13 пунктов (Прием, Укладка, Маркировка ШК/ЧЗ, ОТК, Чистка, Упаковка, Короб, Забор, Проверка, Выезд, Доставка, Отгрузка). Количество авто-рассчитывается с возможностью дублирования и редактирования цен.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button className="btn-secondary" onClick={() => setActiveTab('clients')}>
-                <Building2 size={16} /> Справочник и карточки клиентов
+              <button className="btn-secondary" onClick={() => setActiveTab('acts')}>
+                <FileText size={16} /> Реестр и генератор Актов
               </button>
-              <button className="btn-secondary" onClick={() => setIsSelectClientModalOpen(true)}>
-                <PlusCircle size={16} /> Открыть новую поставку
+              <button className="btn-secondary" onClick={() => setActiveTab('clients')}>
+                <Building2 size={16} /> Карточки реквизитов клиентов
               </button>
             </div>
           </div>

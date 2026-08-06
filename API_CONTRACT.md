@@ -224,5 +224,55 @@
 }
 ```
 
+---
+
+## 6. Эндпоинты Актов Выполненных Работ (п. 11 ТЗ)
+
+### 6.1 Получение списка актов
+* **HTTP Метод:** `GET`
+* **URL:** `/api/v1/acts`
+* **Заголовки:** `Authorization: Bearer <accessToken>`
+
+### 6.2 Создание нового Акта
+* **HTTP Метод:** `POST`
+* **URL:** `/api/v1/acts`
+* **Request Body:**
+```json
+{
+  "actNumber": "АКТ-2026-0806-01",
+  "shipmentId": "shp_1001",
+  "date": "2026-08-06",
+  "operatorName": "Алексей Смирнов",
+  "clientId": "cl_9921",
+  "clientName": "ООО \"Модный Гардероб\"",
+  "clientRequisitesText": "Заказчик: ООО \"Модный Гардероб\", ИНН: 7701234567...",
+  "executorRequisites": {
+    "companyName": "ОсОО \"КРЕАТИВ ВЕЙВ БИШКЕК\"",
+    "legalAddress": "Кыргызская Республика, г. Бишкек, Октябрьский р-н, мкр 10, д. 2, кв 59",
+    "innKpp": "01904202310427 / 019001001",
+    "checkingAccount": "1033220002348631",
+    "corrAccount": "30111810400000073672",
+    "bankName": "ОАО \"МБАНК\"",
+    "bik": "103032",
+    "corrBank": "АО ПЕРВОУРАЛЬСК БАНК",
+    "corrBankBik": "046577402",
+    "corrBankKs": "0101810565770000402",
+    "swiftCode": "KYRSKG22 / PVRBRU4V"
+  },
+  "items": [
+    { "code": "srv_1", "name": "Прием товара", "price": 4, "quantity": 50, "amount": 200, "enabled": true },
+    { "code": "srv_2", "name": "Укладка в короб", "price": 2, "quantity": 50, "amount": 100, "enabled": true },
+    { "code": "srv_3", "name": "Маркировка ШК", "price": 8, "quantity": 50, "amount": 400, "enabled": true },
+    { "code": "srv_7", "name": "Упаковка", "price": 5, "quantity": 50, "amount": 250, "enabled": true },
+    { "code": "srv_8", "name": "Короб", "price": 180, "quantity": 2, "amount": 360, "enabled": true },
+    { "code": "srv_12", "name": "Доставка до Москвы", "price": 5000, "quantity": 1, "amount": 5000, "enabled": true },
+    { "code": "srv_13", "name": "Отгрузка на склад", "price": 1500, "quantity": 1, "amount": 1500, "enabled": true }
+  ],
+  "totalSum": 7810,
+  "status": "signed"
+}
+```
+
+
 
 
