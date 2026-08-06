@@ -3,6 +3,7 @@ import { Client } from '../../types/client';
 import { ClientList } from '../clients/ClientList';
 import { ClientSelectModal } from '../clients/ClientSelectModal';
 import { ActListScreen } from '../acts/ActListScreen';
+import { DocumentRegistryScreen } from '../documents/DocumentRegistryScreen';
 import {
   ShieldCheck,
   Users,
@@ -10,11 +11,12 @@ import {
   PlusCircle,
   Building2,
   TrendingUp,
-  LayoutDashboard
+  LayoutDashboard,
+  Download
 } from 'lucide-react';
 
 export const ManagerDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'acts'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'acts' | 'documents'>('dashboard');
   const [isSelectClientModalOpen, setIsSelectClientModalOpen] = useState(false);
   const [selectedClientForShipment, setSelectedClientForShipment] = useState<Client | null>(null);
 
@@ -32,7 +34,8 @@ export const ManagerDashboard: React.FC = () => {
           borderBottom: '1px solid var(--border)',
           padding: '0.5rem 1.5rem',
           display: 'flex',
-          gap: '0.75rem'
+          gap: '0.75rem',
+          overflowX: 'auto'
         }}
       >
         <button
@@ -67,12 +70,25 @@ export const ManagerDashboard: React.FC = () => {
         >
           <FileText size={15} /> Акты выполненных работ (13 услуг)
         </button>
+
+        <button
+          className={`btn-secondary ${activeTab === 'documents' ? 'active' : ''}`}
+          onClick={() => setActiveTab('documents')}
+          style={{
+            borderColor: activeTab === 'documents' ? 'var(--primary)' : 'var(--border)',
+            color: activeTab === 'documents' ? 'var(--primary)' : 'var(--text-muted)'
+          }}
+        >
+          <Download size={15} /> Центр Выгрузки (Excel / PDF / Word)
+        </button>
       </div>
 
       {activeTab === 'clients' ? (
         <ClientList onSelectClientForShipment={handleStartShipment} />
       ) : activeTab === 'acts' ? (
         <ActListScreen />
+      ) : activeTab === 'documents' ? (
+        <DocumentRegistryScreen />
       ) : (
         <div className="dashboard-container">
           <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -83,8 +99,8 @@ export const ManagerDashboard: React.FC = () => {
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn-secondary" onClick={() => setActiveTab('acts')}>
-                <FileText size={16} /> Создать Акт (13 услуг)
+              <button className="btn-secondary" onClick={() => setActiveTab('documents')}>
+                <Download size={16} /> Выгрузка (Excel/Word)
               </button>
               <button 
                 className="btn-primary" 
@@ -115,7 +131,7 @@ export const ManagerDashboard: React.FC = () => {
                 <Users size={20} color="#3b82f6" />
               </div>
               <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>3 контрагента</div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>Перейти к справочнику $\rightarrow$</span>
+              <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>Справочник карточек $\rightarrow$</span>
             </div>
 
             <div className="card">
@@ -132,23 +148,23 @@ export const ManagerDashboard: React.FC = () => {
                 <FileText size={20} color="#10b981" />
               </div>
               <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>27 актов</div>
-              <span style={{ fontSize: '0.75rem', color: '#10b981' }}>Открыть реестр актов $\rightarrow$</span>
+              <span style={{ fontSize: '0.75rem', color: '#10b981' }}>Реестр и печать актов $\rightarrow$</span>
             </div>
           </div>
 
           <div className="card">
             <h3 className="card-title">
-              <ShieldCheck size={18} color="#3b82f6" /> Интерактивный генератор Акта выполненных работ (п. 11 ТЗ)
+              <ShieldCheck size={18} color="#3b82f6" /> Модуль выгрузки и хранения документов (п. 10 & 11 ТЗ)
             </h3>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              При создании акта выбираются выполнённые услуги из 13 пунктов (Прием, Укладка, Маркировка ШК/ЧЗ, ОТК, Чистка, Упаковка, Короб, Забор, Проверка, Выезд, Доставка, Отгрузка). Количество авто-рассчитывается с возможностью дублирования и редактирования цен.
+              Все сформированные документы (списки товаров по коробкам и складам Wildberries, Акты выполненных работ) сохраняются внутри приложения и доступны для моментального экспорта в Excel (.csv/.xlsx), Word (.doc) и PDF.
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button className="btn-secondary" onClick={() => setActiveTab('acts')}>
-                <FileText size={16} /> Реестр и генератор Актов
+              <button className="btn-secondary" onClick={() => setActiveTab('documents')}>
+                <Download size={16} /> Единый реестр выгрузок
               </button>
-              <button className="btn-secondary" onClick={() => setActiveTab('clients')}>
-                <Building2 size={16} /> Карточки реквизитов клиентов
+              <button className="btn-secondary" onClick={() => setActiveTab('acts')}>
+                <FileText size={16} /> Создать Акт выполненных работ
               </button>
             </div>
           </div>
