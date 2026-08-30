@@ -32,9 +32,11 @@ def format_shipment_response(s: ShipmentModel) -> ShipmentResponse:
         ) for it in s.items
     ]
 
+    # Sort boxes by ID and assign strictly sequential unique boxNumber (1, 2, 3...)
+    sorted_boxes = sorted(s.boxes or [], key=lambda b: getattr(b, 'id', 0) or 0)
     boxes_resp = [
         PackingBoxSchema(
-            boxNumber=b.box_number,
+            boxNumber=idx + 1,
             targetWarehouse=b.target_warehouse,
             isPacked=bool(b.is_packed),
             sealedAt=b.sealed_at,
@@ -46,7 +48,7 @@ def format_shipment_response(s: ShipmentModel) -> ShipmentResponse:
                     quantity=bi.get("quantity", 0)
                 ) for bi in (b.items or [])
             ]
-        ) for b in s.boxes
+        ) for idx, b in enumerate(sorted_boxes)
     ]
 
     return ShipmentResponse(
@@ -332,43 +334,56 @@ def add_item_to_shipment(id: str, it: ShipmentItemBase = Body(...), db: Session 
         lastScannedAt=item_model.last_scanned_at
     )
 
+def get_box_by_number(shipment_id: str, box_number: int, db: Session) -> PackingBoxModel:
+    boxes = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == shipment_id).order_by(PackingBoxModel.id.asc()).all()
+    # Normalize box_number in database to strictly sequential 1, 2, 3...
+    for idx, b in enumerate(boxes):
+        if b.box_number != idx + 1:
+            b.box_number = idx + 1
+    db.commit()
+
+    if 1 <= box_number <= len(boxes):
+        return boxes[box_number - 1]
+    return next((b for b in boxes if b.box_number == box_number), None)
+
 @router.post("/{id}/boxes")
 def create_box(id: str, req: CreateBoxRequest = Body(...), db: Session = Depends(get_db)):
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
 
-    next_num = (max([b.box_number for b in shipment.boxes]) if shipment.boxes else 0) + 1
+    existing_boxes = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id).order_by(PackingBoxModel.id.asc()).all()
+    for idx, b in enumerate(existing_boxes):
+        b.box_number = idx + 1
+
+    next_num = len(existing_boxes) + 1
     new_box = PackingBoxModel(
         shipment_id=id,
         box_number=next_num,
         target_warehouse=req.targetWarehouse,
+        is_packed=False,
         items=[]
     )
     db.add(new_box)
     db.commit()
-    db.refresh(shipment)
+    db.expire_all()
+    
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     return format_shipment_response(shipment)
 
 @router.put("/{id}/boxes/{boxNumber}/warehouse")
 def update_box_warehouse(id: str, boxNumber: int, req: UpdateBoxWarehouseRequest = Body(...), db: Session = Depends(get_db)):
-    box = db.query(PackingBoxModel).filter(
-        PackingBoxModel.shipment_id == id,
-        PackingBoxModel.box_number == boxNumber
-    ).first()
+    box = get_box_by_number(id, boxNumber, db)
     if not box:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
 
     box.target_warehouse = req.targetWarehouse
     db.commit()
-    return {"success": True, "boxNumber": boxNumber, "targetWarehouse": box.target_warehouse}
+    return {"success": True, "boxNumber": box.box_number, "targetWarehouse": box.target_warehouse}
 
 @router.post("/{id}/boxes/{boxNumber}/pack")
 def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest = Body(...), db: Session = Depends(get_db)):
-    box = db.query(PackingBoxModel).filter(
-        PackingBoxModel.shipment_id == id,
-        PackingBoxModel.box_number == boxNumber
-    ).first()
+    box = get_box_by_number(id, boxNumber, db)
     if not box:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
 
@@ -407,8 +422,8 @@ def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest = Body(...), 
 
 @router.post("/{id}/boxes/move")
 def move_items_between_boxes(id: str, req: MoveItemRequest = Body(...), db: Session = Depends(get_db)):
-    from_box = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id, PackingBoxModel.box_number == req.fromBoxNumber).first()
-    to_box = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id, PackingBoxModel.box_number == req.toBoxNumber).first()
+    from_box = get_box_by_number(id, req.fromBoxNumber, db)
+    to_box = get_box_by_number(id, req.toBoxNumber, db)
     if not from_box or not to_box:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
 
@@ -451,20 +466,18 @@ def move_items_between_boxes(id: str, req: MoveItemRequest = Body(...), db: Sess
 
 @router.delete("/{id}/boxes/{boxNumber}")
 def delete_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
-    box = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id, PackingBoxModel.box_number == boxNumber).first()
+    box = get_box_by_number(id, boxNumber, db)
     if not box:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
     db.delete(box)
     db.commit()
+    db.expire_all()
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     return format_shipment_response(shipment)
 
 @router.put("/{id}/boxes/{boxNumber}/seal")
 def seal_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
-    box = db.query(PackingBoxModel).filter(
-        PackingBoxModel.shipment_id == id,
-        PackingBoxModel.box_number == boxNumber
-    ).first()
+    box = get_box_by_number(id, boxNumber, db)
     if not box:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
 

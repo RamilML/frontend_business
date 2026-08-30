@@ -61,12 +61,22 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
     try {
       const data = await ShipmentService.getShipmentById(shipmentId);
       if (data) {
+        // Guarantee strictly unique box numbers (1, 2, 3...)
+        data.boxes.forEach((b, idx) => {
+          b.boxNumber = idx + 1;
+        });
         setShipment(data);
         if (data.boxes.length === 0) {
           // Auto create Box 1 if no boxes exist
-          await ShipmentService.createBox(shipmentId, data.targetWarehouses[0] || 'Коледино');
+          const newBox = await ShipmentService.createBox(shipmentId, data.targetWarehouses[0] || 'Коледино');
           const refreshed = await ShipmentService.getShipmentById(shipmentId);
-          setShipment(refreshed);
+          if (refreshed) {
+            refreshed.boxes.forEach((b, idx) => {
+              b.boxNumber = idx + 1;
+            });
+            setShipment(refreshed);
+            setActiveBoxNumber(newBox.boxNumber || 1);
+          }
         } else if (!data.boxes.some((b) => b.boxNumber === activeBoxNumber)) {
           setActiveBoxNumber(data.boxes[0].boxNumber);
         }
@@ -106,8 +116,18 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const handleCreateNewBox = async () => {
     const defaultWarehouse = shipment.targetWarehouses[0] || 'Коледино';
     const newBox = await ShipmentService.createBox(shipmentId, defaultWarehouse);
-    await loadShipment();
-    setActiveBoxNumber(newBox.boxNumber);
+    const refreshed = await ShipmentService.getShipmentById(shipmentId);
+    if (refreshed) {
+      refreshed.boxes.forEach((b, idx) => {
+        b.boxNumber = idx + 1;
+      });
+      setShipment(refreshed);
+      if (newBox?.boxNumber) {
+        setActiveBoxNumber(newBox.boxNumber);
+      } else if (refreshed.boxes.length > 0) {
+        setActiveBoxNumber(refreshed.boxes[refreshed.boxes.length - 1].boxNumber);
+      }
+    }
   };
 
   const handleWarehouseChange = async (boxNumber: number, newWarehouse: WBWarehouse) => {
@@ -304,15 +324,16 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.25rem' }}>
-          {shipment.boxes.map((box) => {
-            const isActive = box.boxNumber === activeBoxNumber;
+          {shipment.boxes.map((box, index) => {
+            const boxNum = box.boxNumber || (index + 1);
+            const isActive = boxNum === activeBoxNumber;
             const totalQtyInBox = box.items.reduce((acc, it) => acc + it.quantity, 0);
             const isSealed = Boolean(box.isPacked);
 
             return (
               <div
-                key={box.boxNumber}
-                onClick={() => setActiveBoxNumber(box.boxNumber)}
+                key={`box-card-${boxNum}-${index}`}
+                onClick={() => setActiveBoxNumber(boxNum)}
                 style={{
                   padding: '0.75rem 1rem',
                   borderRadius: 'var(--radius-md)',

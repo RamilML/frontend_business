@@ -698,6 +698,12 @@ export class ShipmentService {
         });
         if (res.ok) {
           const updatedShp = await res.json();
+          const list = this.loadStoredShipments();
+          const idx = list.findIndex((s) => s.id === shipmentId);
+          if (idx !== -1) {
+            list[idx] = updatedShp;
+            this.saveStoredShipments(list);
+          }
           return updatedShp.boxes[updatedShp.boxes.length - 1];
         }
       } catch (e) {
@@ -709,11 +715,17 @@ export class ShipmentService {
     const shipment = list.find((s) => s.id === shipmentId);
     if (!shipment) throw new Error('Поставка не найдена');
 
-    const nextBoxNumber = (shipment.boxes.length > 0 ? Math.max(...shipment.boxes.map((b) => b.boxNumber)) : 0) + 1;
+    // Ensure sequential box numbers
+    shipment.boxes.forEach((b, idx) => {
+      b.boxNumber = idx + 1;
+    });
+
+    const nextBoxNumber = shipment.boxes.length + 1;
 
     const newBox: PackingBox = {
       boxNumber: nextBoxNumber,
       targetWarehouse,
+      isPacked: false,
       items: []
     };
 
