@@ -21,7 +21,9 @@ import {
   Sparkles,
   Rocket,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  Minus
 } from 'lucide-react';
 
 interface Props {
@@ -113,11 +115,34 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
     loadShipment();
   };
 
+  const handleSelectItem = (itemId: string) => {
+    setSelectedItemId(itemId);
+    if (!itemId || !shipment) {
+      setPackQuantity(1);
+      return;
+    }
+    const item = shipment.items.find((it) => it.id === itemId);
+    if (item) {
+      // Считаем сколько уже уложено этого товара во все коробки
+      const alreadyPacked = shipment.boxes.reduce((acc, b) => {
+        const found = b.items.find((bi) => bi.itemId === itemId);
+        return acc + (found ? found.quantity : 0);
+      }, 0);
+
+      // По умолчанию подставляем оставшееся неупакованное количество (или все принятое)
+      const remaining = Math.max(1, item.scannedQuantity - alreadyPacked);
+      setPackQuantity(remaining);
+    } else {
+      setPackQuantity(1);
+    }
+  };
+
   const handlePackItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedItemId || !activeBox) return;
 
     await ShipmentService.packItemToBox(shipmentId, activeBox.boxNumber, selectedItemId, packQuantity);
+    setSelectedItemId('');
     setPackQuantity(1);
     loadShipment();
   };
@@ -442,34 +467,66 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                   <select
                     className="form-input"
                     value={selectedItemId}
-                    onChange={(e) => setSelectedItemId(e.target.value)}
+                    onChange={(e) => handleSelectItem(e.target.value)}
                     style={{ paddingLeft: '0.75rem' }}
                     required
                   >
-                    <option value="">-- Выберите товар --</option>
-                    {shipment.items.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.title} (Отсканировано: {item.scannedQuantity} шт.)
-                      </option>
-                    ))}
+                    <option value="">-- Выберите товар для укладки --</option>
+                    {shipment.items.map((item) => {
+                      const alreadyPacked = shipment.boxes.reduce((acc, b) => {
+                        const found = b.items.find((bi) => bi.itemId === item.id);
+                        return acc + (found ? found.quantity : 0);
+                      }, 0);
+                      const remaining = Math.max(0, item.scannedQuantity - alreadyPacked);
+
+                      return (
+                        <option key={item.id} value={item.id}>
+                          {item.title} (Принято: {item.scannedQuantity} шт. • Не упаковано: {remaining} шт.)
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Количество для укладки</label>
-                  <input
-                    type="number"
-                    className="form-input"
-                    value={packQuantity}
-                    onChange={(e) => setPackQuantity(Math.max(1, Number(e.target.value)))}
-                    min={1}
-                    style={{ paddingLeft: '0.75rem' }}
-                    required
-                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                    <label className="form-label" style={{ margin: 0 }}>Количество для укладки</label>
+                    {selectedItemId && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
+                        По умолчанию: всё принятое
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="number-stepper">
+                    <button
+                      type="button"
+                      className="number-stepper-btn"
+                      onClick={() => setPackQuantity((q) => Math.max(1, q - 1))}
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      className="form-input form-input-number"
+                      style={{ textAlign: 'center', padding: '0.4rem 0.5rem', background: 'transparent', border: 'none' }}
+                      value={packQuantity}
+                      onChange={(e) => setPackQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="number-stepper-btn"
+                      onClick={() => setPackQuantity((q) => q + 1)}
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
                 </div>
 
                 <button type="submit" className="btn-primary" disabled={!selectedItemId}>
-                  <PackageCheck size={16} /> Положить в коробку
+                  <PackageCheck size={16} /> Положить {packQuantity} шт. в коробку
                 </button>
               </form>
             ) : null}
