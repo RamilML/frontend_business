@@ -28,6 +28,7 @@ import {
 
 interface Props {
   shipmentId: string;
+  initialShipment?: Shipment;
   onBack: () => void;
 }
 
@@ -42,10 +43,10 @@ const AVAILABLE_WB_WAREHOUSES: WBWarehouse[] = [
   'СПб Уткина Заводь'
 ];
 
-export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
-  const [shipment, setShipment] = useState<Shipment | null>(null);
+export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, onBack }) => {
+  const [shipment, setShipment] = useState<Shipment | null>(initialShipment || null);
   const [activeBoxNumber, setActiveBoxNumber] = useState<number>(1);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!initialShipment);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Modals

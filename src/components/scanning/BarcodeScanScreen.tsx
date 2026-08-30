@@ -234,21 +234,23 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   };
 
   // Immediate optimistic + / - quantity adjustment
-  const handleUpdateQuantity = async (itemId: string, currentQty: number, delta: number) => {
-    const newQty = Math.max(0, currentQty + delta);
-    
+  const handleUpdateQuantity = async (itemId: string, delta: number) => {
+    let targetNewQty = 0;
     setShipment((prev) => {
       if (!prev) return prev;
+      const targetItem = prev.items.find((it) => it.id === itemId);
+      const current = targetItem ? targetItem.scannedQuantity : 0;
+      targetNewQty = Math.max(0, current + delta);
       return {
         ...prev,
         items: prev.items.map((it) =>
-          it.id === itemId ? { ...it, scannedQuantity: newQty, lastScannedAt: new Date().toISOString() } : it
+          it.id === itemId ? { ...it, scannedQuantity: targetNewQty, lastScannedAt: new Date().toISOString() } : it
         )
       };
     });
 
     try {
-      await ShipmentService.updateItemQuantity(shipmentId, itemId, newQty);
+      await ShipmentService.updateItemQuantity(shipmentId, itemId, targetNewQty);
     } catch (e) {
       console.warn('Update quantity error:', e);
     }
@@ -356,6 +358,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
     return (
       <PackingScreen
         shipmentId={shipmentId}
+        initialShipment={shipment}
         onBack={() => {
           setIsPackingView(false);
           loadShipment(false);
@@ -582,7 +585,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              handleUpdateQuantity(item.id, item.scannedQuantity, -1);
+                              handleUpdateQuantity(item.id, -1);
                             }}
                             style={{ padding: '0.35rem 0.55rem', cursor: 'pointer' }}
                             title="Уменьшить количество (-1)"
@@ -597,7 +600,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              handleUpdateQuantity(item.id, item.scannedQuantity, 1);
+                              handleUpdateQuantity(item.id, 1);
                             }}
                             style={{ padding: '0.35rem 0.55rem', borderColor: 'var(--primary)', cursor: 'pointer' }}
                             title="Добавить количество (+1)"
