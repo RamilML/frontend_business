@@ -12,7 +12,9 @@ import {
   Play,
   Building2,
   Edit2,
-  Trash2
+  Trash2,
+  Box,
+  CheckCircle2
 } from 'lucide-react';
 
 export const OperatorDashboard: React.FC = () => {
@@ -21,6 +23,7 @@ export const OperatorDashboard: React.FC = () => {
   const [isNewShipmentOpen, setIsNewShipmentOpen] = useState(false);
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
   const [deletingShipment, setDeletingShipment] = useState<Shipment | null>(null);
+  const [shippingShipmentId, setShippingShipmentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadShipments = async () => {
@@ -75,6 +78,18 @@ export const OperatorDashboard: React.FC = () => {
       loadShipments();
     } catch (err) {
       console.error('Delete shipment error:', err);
+    }
+  };
+
+  const handleShipToDriver = async (shipmentId: string) => {
+    setShippingShipmentId(shipmentId);
+    try {
+      await ShipmentService.shipShipment(shipmentId);
+      await loadShipments();
+    } catch (err) {
+      console.error('Ship shipment error:', err);
+    } finally {
+      setShippingShipmentId(null);
     }
   };
 
@@ -229,16 +244,61 @@ export const OperatorDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <button
-                    className="btn-primary"
-                    onClick={() => setActiveShipmentId(shp.id)}
-                    style={{ width: '100%' }}
-                  >
-                    <Play size={16} /> Начать / Продолжить сканирование
-                  </button>
-                </div>
-              );
-            })}
+                    {/* Action buttons depending on shipment status */}
+                    {shp.status === 'ready_to_ship' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={() => handleShipToDriver(shp.id)}
+                          disabled={shippingShipmentId === shp.id}
+                          style={{
+                            background: '#10b981',
+                            borderColor: '#10b981',
+                            color: '#fff',
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.5rem',
+                            padding: '0.65rem'
+                          }}
+                        >
+                          <Truck size={16} />
+                          {shippingShipmentId === shp.id ? 'Отгрузка...' : '🚚 Отгрузить водителю'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => setActiveShipmentId(shp.id)}
+                          style={{ width: '100%', fontSize: '0.8rem', padding: '0.4rem' }}
+                        >
+                          <Box size={14} /> Открыть коробки / Сканер
+                        </button>
+                      </div>
+                    ) : shp.status === 'shipped' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => setActiveShipmentId(shp.id)}
+                          style={{ width: '100%', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
+                        >
+                          <CheckCircle2 size={15} /> Поставка отгружена (Детали)
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className="btn-primary"
+                        onClick={() => setActiveShipmentId(shp.id)}
+                        style={{ width: '100%' }}
+                      >
+                        <Play size={16} /> {shp.status === 'packing' ? '📦 Перейти к упаковке' : 'Начать / Продолжить сканирование'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         )}
       </div>

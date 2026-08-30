@@ -188,10 +188,19 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
     try {
       const updated = await ShipmentService.finalizePacking(shipmentId);
       setShipment(updated);
-      setSuccessMessage('🎉 Поставка полностью упакована и переведена в статус «Готова к отгрузке»!');
-      setTimeout(() => setSuccessMessage(null), 5000);
-    } catch (err) {
-      console.error('Finalize shipment packing error:', err);
+      setSuccessMessage('🎉 Поставка успешно запечатана и переведена в статус «Готова к отгрузке»!');
+    } catch (e) {
+      console.warn('Finalize error:', e);
+    }
+  };
+
+  const handleShipToDriver = async () => {
+    try {
+      const updated = await ShipmentService.shipShipment(shipmentId);
+      setShipment(updated);
+      setSuccessMessage('🚚 Поставка успешно передана водителю и переведена в статус «Отгружена»!');
+    } catch (e) {
+      console.warn('Ship error:', e);
     }
   };
 
@@ -220,7 +229,11 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
               <h2 style={{ fontSize: '1.4rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Box color="var(--primary)" size={24} /> Упаковка в коробки: {shipment.shipmentNumber}
               </h2>
-              {shipment.status === 'ready_to_ship' ? (
+              {shipment.status === 'shipped' ? (
+                <span className="badge badge-client" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                  <Truck size={14} /> Отгружена водителю
+                </span>
+              ) : shipment.status === 'ready_to_ship' ? (
                 <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                   <ShieldCheck size={14} /> Готова к отгрузке
                 </span>
@@ -241,7 +254,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
             <Printer size={16} /> Упаковочный лист (Печать)
           </button>
 
-          {allBoxesSealed && shipment.status !== 'ready_to_ship' && (
+          {allBoxesSealed && shipment.status !== 'ready_to_ship' && shipment.status !== 'shipped' && (
             <button
               type="button"
               className="btn-primary"
@@ -252,9 +265,22 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
             </button>
           )}
 
-          <button className="btn-primary" onClick={handleCreateNewBox} style={{ width: 'auto' }}>
-            <PlusCircle size={16} /> Добавить Коробку
-          </button>
+          {shipment.status === 'ready_to_ship' && (
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleShipToDriver}
+              style={{ background: '#38bdf8', borderColor: '#38bdf8', color: '#0f172a', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem', width: 'auto' }}
+            >
+              <Truck size={16} /> 🚚 Отгрузить водителю
+            </button>
+          )}
+
+          {shipment.status !== 'shipped' && (
+            <button className="btn-primary" onClick={handleCreateNewBox} style={{ width: 'auto' }}>
+              <PlusCircle size={16} /> Добавить Коробку
+            </button>
+          )}
         </div>
       </div>
 

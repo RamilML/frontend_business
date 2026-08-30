@@ -508,3 +508,16 @@ def finalize_packing(id: str, db: Session = Depends(get_db)):
     db.refresh(shipment)
 
     return format_shipment_response(shipment)
+
+@router.post("/{id}/ship")
+def ship_shipment(id: str, db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    shipment.status = "shipped"
+    shipment.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(shipment)
+
+    return format_shipment_response(shipment)

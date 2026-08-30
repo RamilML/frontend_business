@@ -1022,4 +1022,47 @@ export class ShipmentService {
     this.saveStoredShipments(list);
     return shipment;
   }
+
+  /**
+   * Отгрузка поставки водителю (перевод в shipped)
+   */
+  public static async shipShipment(shipmentId: string): Promise<Shipment> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/ship`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const list = this.loadStoredShipments();
+          const idx = list.findIndex((s) => s.id === shipmentId);
+          if (idx !== -1) {
+            list[idx] = data;
+            this.saveStoredShipments(list);
+          }
+          audioSynth.playSuccessBeep();
+          audioSynth.triggerHapticSuccess();
+          return data;
+        }
+      } catch (e) {
+        console.warn('Ship shipment server call failed:', e);
+      }
+    }
+
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    shipment.status = 'shipped';
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+
+    audioSynth.playSuccessBeep();
+    audioSynth.triggerHapticSuccess();
+    return shipment;
+  }
 }
