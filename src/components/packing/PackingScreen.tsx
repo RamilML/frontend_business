@@ -104,6 +104,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const activeBox = shipment.boxes.find((b) => b.boxNumber === activeBoxNumber) || shipment.boxes[0];
 
   // Calculations for progress
+  const totalPlannedInShipment = shipment.items.reduce((acc, it) => acc + it.plannedQuantity, 0);
   const totalScannedInShipment = shipment.items.reduce((acc, it) => acc + it.scannedQuantity, 0);
   const totalPackedInBoxes = shipment.boxes.reduce((acc, b) => acc + b.items.reduce((sum, bi) => sum + bi.quantity, 0), 0);
   const remainingUnpacked = Math.max(0, totalScannedInShipment - totalPackedInBoxes);
@@ -308,12 +309,12 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
       {/* Packing Progress & Summary Banner */}
       <div className="card" style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', fontSize: '0.9rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', fontSize: '0.9rem', flexWrap: 'wrap' }}>
             <div>
-              Принято товаров: <b>{totalScannedInShipment} шт.</b>
+              Принято на складе: <b style={{ color: totalScannedInShipment === totalPlannedInShipment ? '#10b981' : 'var(--primary)' }}>{totalScannedInShipment} из {totalPlannedInShipment} шт.</b> <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>(Факт / План)</span>
             </div>
             <div>
-              Разложено по коробкам: <b style={{ color: totalPackedInBoxes === totalScannedInShipment && totalScannedInShipment > 0 ? '#10b981' : 'var(--primary)' }}>{totalPackedInBoxes} шт.</b>
+              Разложено по коробкам: <b style={{ color: totalPackedInBoxes === totalScannedInShipment && totalScannedInShipment > 0 ? '#10b981' : '#38bdf8' }}>{totalPackedInBoxes} из {totalScannedInShipment} шт.</b>
             </div>
             {remainingUnpacked > 0 && (
               <div style={{ color: '#f59e0b', fontWeight: 600 }}>
@@ -326,7 +327,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
           </div>
 
           <div style={{ fontWeight: 700, fontSize: '0.95rem', color: totalPackedInBoxes === totalScannedInShipment && totalScannedInShipment > 0 ? '#10b981' : 'var(--primary)' }}>
-            Прогресс: {packingProgressPercent}%
+            Прогресс упаковки: {packingProgressPercent}%
           </div>
         </div>
 
@@ -341,6 +342,12 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
             }}
           />
         </div>
+
+        {totalScannedInShipment < totalPlannedInShipment && (
+          <div style={{ marginTop: '0.6rem', fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <span>ℹ️ Принято по сканеру <b>{totalScannedInShipment} из {totalPlannedInShipment} шт.</b> Чтобы принять остальные {totalPlannedInShipment - totalScannedInShipment} шт., вернитесь в сканер («Назад к сканеру»).</span>
+          </div>
+        )}
       </div>
 
       {/* Manual Box Selector Bar */}
@@ -527,9 +534,17 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                       }, 0);
                       const remaining = Math.max(0, item.scannedQuantity - alreadyPacked);
 
+                      if (item.scannedQuantity === 0) {
+                        return (
+                          <option key={item.id} value={item.id} disabled>
+                            {item.title} (❌ Не принято в сканере: 0 из {item.plannedQuantity} шт.)
+                          </option>
+                        );
+                      }
+
                       return (
                         <option key={item.id} value={item.id}>
-                          {item.title} (Принято: {item.scannedQuantity} шт. • Не упаковано: {remaining} шт.)
+                          {item.title} (Принято: {item.scannedQuantity} из {item.plannedQuantity} шт. • Не упаковано: {remaining} шт.)
                         </option>
                       );
                     })}
