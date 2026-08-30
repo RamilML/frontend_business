@@ -143,22 +143,25 @@ body {
   transition: all 0.2s ease;
 }
 
-/* Яркие, заметные стрелки для числовых полей ввода */
+/* Полностью скрываем стандартные браузерные стрелки у числовых полей ввода */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
-  opacity: 0.95 !important;
-  filter: invert(1) brightness(2.5) contrast(1.5);
-  cursor: pointer;
-  height: 28px;
-  padding: 0 4px;
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+  display: none !important;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
 }
 
 .form-input-number {
-  padding-left: 1rem !important;
-  padding-right: 0.5rem !important;
-  font-size: 1.05rem;
-  font-weight: 600;
-  font-family: var(--font-mono);
+  padding: 0.4rem 0.5rem !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  font-family: var(--font-mono) !important;
+  text-align: center !important;
 }
 
 .number-stepper {
