@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "backend": "cd backend && (./venv/bin/python3 run.py || python3 run.py)",
+    "backend": "cd backend && ./venv/bin/python3 run.py",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
