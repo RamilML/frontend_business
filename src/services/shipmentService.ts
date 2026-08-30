@@ -203,8 +203,29 @@ export class ShipmentService {
       this.saveStoredShipments(list);
       return created;
     } catch (e) {
-      // Fallback
-      return this.createShipment({ ...dto });
+      console.warn('Create shipment server call failed, creating local fallback:', e);
+      const list = this.loadStoredShipments();
+      const localShipment: Shipment = {
+        id: `shp_${Date.now()}`,
+        shipmentNumber: dto.shipmentNumber,
+        clientId: dto.clientId,
+        clientName: dto.clientId,
+        targetWarehouses: dto.targetWarehouses,
+        status: 'draft',
+        operatorId: user?.id,
+        operatorName: user?.name,
+        boxes: [],
+        items: (dto.initialItems || []).map((it, idx) => ({
+          ...it,
+          id: `item_${Date.now()}_${idx}`,
+          scannedQuantity: 0
+        })),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      list.unshift(localShipment);
+      this.saveStoredShipments(list);
+      return localShipment;
     }
   }
 
