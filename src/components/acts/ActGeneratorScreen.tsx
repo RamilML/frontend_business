@@ -338,22 +338,24 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
 
                     {/* Service Name */}
                     <td style={{ padding: '0.75rem' }}>
-                      {item.isCustom ? (
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={item.name}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setServiceItems((prev) =>
-                              prev.map((i) => (i.id === item.id ? { ...i, name: val } : i))
-                            );
-                          }}
-                          style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
-                        />
-                      ) : (
-                        <span style={{ fontWeight: item.enabled ? 600 : 400 }}>{item.name}</span>
-                      )}
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={item.name}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setServiceItems((prev) =>
+                            prev.map((i) => (i.id === item.id ? { ...i, name: val, enabled: true } : i))
+                          );
+                        }}
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.85rem',
+                          fontWeight: item.enabled ? 600 : 400,
+                          background: item.enabled ? 'rgba(30, 41, 59, 0.6)' : 'rgba(15, 23, 42, 0.4)',
+                          borderColor: item.enabled ? 'var(--border)' : 'rgba(51, 65, 85, 0.3)'
+                        }}
+                      />
                     </td>
 
                     {/* Price (Column 2 - Editable) */}
@@ -361,10 +363,20 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
                       <input
                         type="number"
                         className="form-input"
-                        value={item.price}
+                        value={item.price || ''}
+                        onFocus={(e) => {
+                          if (!item.enabled) toggleServiceEnabled(item.id);
+                          e.target.select();
+                        }}
                         onChange={(e) => updateServicePrice(item.id, Number(e.target.value))}
-                        disabled={!item.enabled}
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', width: '100%', fontFamily: 'var(--font-mono)' }}
+                        placeholder="0"
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.85rem',
+                          width: '100%',
+                          fontFamily: 'var(--font-mono)',
+                          background: item.enabled ? 'rgba(30, 41, 59, 0.6)' : 'rgba(15, 23, 42, 0.4)'
+                        }}
                       />
                     </td>
 
@@ -373,11 +385,21 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
                       <input
                         type="number"
                         className="form-input"
-                        value={item.quantity}
+                        value={item.quantity || ''}
+                        onFocus={(e) => {
+                          if (!item.enabled) toggleServiceEnabled(item.id);
+                          e.target.select();
+                        }}
                         onChange={(e) => updateServiceQuantity(item.id, Number(e.target.value))}
-                        disabled={!item.enabled}
                         min={0}
-                        style={{ padding: '0.25rem 0.5rem', fontSize: '0.85rem', width: '100%', fontFamily: 'var(--font-mono)' }}
+                        placeholder="0"
+                        style={{
+                          padding: '0.25rem 0.5rem',
+                          fontSize: '0.85rem',
+                          width: '100%',
+                          fontFamily: 'var(--font-mono)',
+                          background: item.enabled ? 'rgba(30, 41, 59, 0.6)' : 'rgba(15, 23, 42, 0.4)'
+                        }}
                       />
                     </td>
 
