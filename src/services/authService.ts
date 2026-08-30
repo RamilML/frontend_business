@@ -6,7 +6,7 @@ const STORAGE_KEY_CONFIG = 'ff_assistant_api_config';
 
 export const DEFAULT_API_CONFIG: ApiConfig = {
   baseUrl: 'http://localhost:8000/api/v1',
-  useMock: true,
+  useMock: false,
   timeoutMs: 5000,
 };
 
