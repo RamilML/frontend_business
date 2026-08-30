@@ -10,7 +10,7 @@ from app.schemas.shipment import (
     ShipmentCreate, ShipmentUpdate, ShipmentResponse, ShipmentItemResponse, ShipmentItemBase,
     ScanRequest, ScanResponse, UpdateItemQtyRequest, UpdateItemDetailsRequest,
     CreateBoxRequest, UpdateBoxWarehouseRequest, PackItemRequest, MoveItemRequest,
-    PackingBoxSchema, BoxItemSchema, CatalogProductSchema
+    UpdateBoxItemQuantityRequest, PackingBoxSchema, BoxItemSchema, CatalogProductSchema
 )
 
 router = APIRouter(prefix="/shipments", tags=["Shipments"])
@@ -449,6 +449,21 @@ def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest = Body(...), 
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Товар не найден")
 
+    # Count how many of this item are already packed across all boxes
+    all_boxes = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id).all()
+    already_packed = 0
+    for b in all_boxes:
+        for bi in (b.items or []):
+            if bi.get("itemId") == req.itemId:
+                already_packed += bi.get("quantity", 0)
+
+    remaining_available = max(0, item.scanned_quantity - already_packed)
+    if req.quantity > remaining_available:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Нельзя положить {req.quantity} шт. товара «{item.title}». В наличии принято сканером {item.scanned_quantity} шт., уже уложено {already_packed} шт. (осталось {remaining_available} шт.)."
+        )
+
     current_items = list(box.items or [])
     found = False
     for bi in current_items:
@@ -465,13 +480,119 @@ def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest = Body(...), 
         })
 
     box.items = current_items
-    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
-    if shipment:
-        if shipment.status in ["draft", "receiving"]:
-            shipment.status = "packing"
-        shipment.updated_at = datetime.utcnow()
+    if shipment.status in ["draft", "receiving", "ready_to_ship"]:
+        shipment.status = "packing"
+    shipment.updated_at = datetime.utcnow()
     db.commit()
     
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    return format_shipment_response(shipment)
+
+@router.put("/{id}/boxes/{boxNumber}/items/{itemId}")
+def update_box_item_quantity(
+    id: str,
+    boxNumber: int,
+    itemId: str,
+    req: UpdateBoxItemQuantityRequest = Body(...),
+    db: Session = Depends(get_db)
+):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Корректировка коробок заблокирована."
+        )
+
+    box = get_box_by_number(id, boxNumber, db)
+    if not box:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
+
+    if box.is_packed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Коробка запечатана. Вскройте её для изменения состава.")
+
+    item = db.query(ShipmentItemModel).filter(
+        ShipmentItemModel.shipment_id == id,
+        ShipmentItemModel.id == itemId
+    ).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Товар не найден")
+
+    # Count how many are packed in OTHER boxes
+    all_boxes = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id).all()
+    packed_in_other_boxes = 0
+    for b in all_boxes:
+        if b.box_number != boxNumber:
+            for bi in (b.items or []):
+                if bi.get("itemId") == itemId:
+                    packed_in_other_boxes += bi.get("quantity", 0)
+
+    max_allowed_in_this_box = max(0, item.scanned_quantity - packed_in_other_boxes)
+    if req.quantity > max_allowed_in_this_box:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Нельзя установить {req.quantity} шт. Максимум доступно: {max_allowed_in_this_box} шт."
+        )
+
+    current_items = list(box.items or [])
+    if req.quantity <= 0:
+        current_items = [bi for bi in current_items if bi.get("itemId") != itemId]
+    else:
+        found = False
+        for bi in current_items:
+            if bi.get("itemId") == itemId:
+                bi["quantity"] = req.quantity
+                found = True
+                break
+        if not found:
+            current_items.append({
+                "itemId": item.id,
+                "barcode": item.barcode,
+                "title": item.title,
+                "quantity": req.quantity
+            })
+
+    box.items = current_items
+    if shipment.status in ["draft", "receiving", "ready_to_ship"]:
+        shipment.status = "packing"
+    shipment.updated_at = datetime.utcnow()
+    db.commit()
+
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    return format_shipment_response(shipment)
+
+@router.delete("/{id}/boxes/{boxNumber}/items/{itemId}")
+def remove_item_from_box(
+    id: str,
+    boxNumber: int,
+    itemId: str,
+    db: Session = Depends(get_db)
+):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Удаление из коробок заблокировано."
+        )
+
+    box = get_box_by_number(id, boxNumber, db)
+    if not box:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
+
+    if box.is_packed:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Коробка запечатана. Вскройте её для изменения состава.")
+
+    box.items = [bi for bi in (box.items or []) if bi.get("itemId") != itemId]
+    if shipment.status in ["draft", "receiving", "ready_to_ship"]:
+        shipment.status = "packing"
+    shipment.updated_at = datetime.utcnow()
+    db.commit()
+
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     return format_shipment_response(shipment)
 

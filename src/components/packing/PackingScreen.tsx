@@ -139,6 +139,17 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
     loadShipment();
   };
 
+  const selectedItem = shipment.items.find((it) => it.id === selectedItemId);
+  const selectedItemAlreadyPacked = selectedItem
+    ? shipment.boxes.reduce((acc, b) => {
+        const found = b.items.find((bi) => bi.itemId === selectedItem.id);
+        return acc + (found ? found.quantity : 0);
+      }, 0)
+    : 0;
+  const selectedItemRemaining = selectedItem
+    ? Math.max(0, selectedItem.scannedQuantity - selectedItemAlreadyPacked)
+    : 0;
+
   const handleSelectItem = (itemId: string) => {
     setSelectedItemId(itemId);
     const item = shipment.items.find((it) => it.id === itemId);
@@ -158,6 +169,11 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
     const qty = parseInt(String(packQuantity), 10);
     if (isNaN(qty) || qty <= 0) return;
 
+    if (qty > selectedItemRemaining) {
+      alert(`Нельзя положить ${qty} шт. В наличии свободно только ${selectedItemRemaining} шт.`);
+      return;
+    }
+
     try {
       const updated = await ShipmentService.packItemToBox(shipmentId, activeBoxNumber, selectedItemId, qty);
       setShipment(updated);
@@ -167,6 +183,26 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
       setTimeout(() => setSuccessMessage(null), 3500);
     } catch (err: any) {
       alert(err?.message || 'Ошибка укладки в коробку');
+    }
+  };
+
+  const handleUpdateBoxItemQuantity = async (boxNumber: number, itemId: string, newQty: number) => {
+    try {
+      const updated = await ShipmentService.updateBoxItemQuantity(shipmentId, boxNumber, itemId, newQty);
+      setShipment(updated);
+    } catch (err: any) {
+      alert(err?.message || 'Ошибка изменения количества');
+    }
+  };
+
+  const handleRemoveItemFromBox = async (boxNumber: number, itemId: string) => {
+    if (window.confirm('Выложить этот товар из коробки (вернуть в остаток)?')) {
+      try {
+        const updated = await ShipmentService.removeItemFromBox(shipmentId, boxNumber, itemId);
+        setShipment(updated);
+      } catch (err: any) {
+        alert(err?.message || 'Ошибка удаления товара из коробки');
+      }
     }
   };
 
@@ -642,9 +678,17 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                         );
                       }
 
+                      if (remaining === 0) {
+                        return (
+                          <option key={item.id} value={item.id} disabled style={{ color: 'var(--text-muted)' }}>
+                            {item.title} (✅ Упаковано 100%: {item.scannedQuantity} из {item.scannedQuantity} шт.)
+                          </option>
+                        );
+                      }
+
                       return (
                         <option key={item.id} value={item.id}>
-                          {item.title} (Принято: {item.scannedQuantity} из {item.plannedQuantity} шт. • Не упаковано: {remaining} шт.)
+                          {item.title} (Осталось уложить: {remaining} из {item.scannedQuantity} шт.)
                         </option>
                       );
                     })}
@@ -655,8 +699,8 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
                     <label className="form-label" style={{ margin: 0 }}>Количество для укладки</label>
                     {selectedItemId && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
-                        По умолчанию: всё принятое
+                      <span style={{ fontSize: '0.75rem', color: selectedItemRemaining > 0 ? 'var(--primary)' : '#f43f5e' }}>
+                        Доступно для укладки: <b>{selectedItemRemaining} шт.</b>
                       </span>
                     )}
                   </div>
@@ -666,12 +710,14 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                       type="button"
                       className="number-stepper-btn"
                       onClick={() => setPackQuantity((q) => Math.max(1, (Number(q) || 0) - 1))}
+                      disabled={Number(packQuantity) <= 1}
                     >
                       <Minus size={14} />
                     </button>
                     <input
                       type="number"
                       min="1"
+                      max={selectedItemRemaining || 1}
                       className="form-input form-input-number"
                       style={{ textAlign: 'center', padding: '0.4rem 0.5rem', background: 'transparent', border: 'none' }}
                       value={packQuantity}
@@ -682,12 +728,19 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                           setPackQuantity('');
                         } else {
                           const parsed = parseInt(val, 10);
-                          setPackQuantity(isNaN(parsed) ? '' : Math.max(0, parsed));
+                          if (isNaN(parsed)) {
+                            setPackQuantity('');
+                          } else {
+                            const bounded = Math.min(selectedItemRemaining || 1, Math.max(1, parsed));
+                            setPackQuantity(bounded);
+                          }
                         }
                       }}
                       onBlur={() => {
                         if (!packQuantity || Number(packQuantity) < 1) {
                           setPackQuantity(1);
+                        } else if (Number(packQuantity) > selectedItemRemaining && selectedItemRemaining > 0) {
+                          setPackQuantity(selectedItemRemaining);
                         }
                       }}
                       required
@@ -695,14 +748,19 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                     <button
                       type="button"
                       className="number-stepper-btn"
-                      onClick={() => setPackQuantity((q) => (Number(q) || 0) + 1)}
+                      onClick={() => setPackQuantity((q) => Math.min(selectedItemRemaining || 1, (Number(q) || 0) + 1))}
+                      disabled={selectedItemRemaining <= 0 || Number(packQuantity) >= selectedItemRemaining}
                     >
                       <Plus size={14} />
                     </button>
                   </div>
                 </div>
 
-                <button type="submit" className="btn-primary" disabled={!selectedItemId}>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={!selectedItemId || selectedItemRemaining <= 0 || Number(packQuantity) <= 0}
+                >
                   <PackageCheck size={16} /> Положить {packQuantity || 1} шт. в коробку
                 </button>
               </form>
@@ -748,19 +806,94 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                     <tr style={{ background: 'rgba(15, 23, 42, 0.7)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
                       <th style={{ padding: '0.75rem 1.25rem' }}>Наименование товара</th>
                       <th style={{ padding: '0.75rem 1rem' }}>Штрихкод</th>
-                      <th style={{ padding: '0.75rem 1.25rem', textAlign: 'right' }}>Количество</th>
+                      <th style={{ padding: '0.75rem 1.25rem', textAlign: 'right' }}>Количество в коробке</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {activeBox.items.map((item, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.4)' }}>
-                        <td style={{ padding: '0.75rem 1.25rem', fontWeight: 600 }}>{item.title}</td>
-                        <td style={{ padding: '0.75rem 1rem', fontFamily: 'var(--font-mono)' }}>{item.barcode}</td>
-                        <td style={{ padding: '0.75rem 1.25rem', textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
-                          {item.quantity} шт.
-                        </td>
-                      </tr>
-                    ))}
+                    {activeBox.items.map((item, idx) => {
+                      // Calculate available units left for this specific item
+                      const parentItem = shipment.items.find((it) => it.id === item.itemId || it.barcode === item.barcode);
+                      const totalPackedAcrossBoxes = shipment.boxes.reduce((acc, b) => {
+                        const found = b.items.find((bi) => bi.itemId === item.itemId || bi.barcode === item.barcode);
+                        return acc + (found ? found.quantity : 0);
+                      }, 0);
+                      const totalScannedForThisItem = parentItem?.scannedQuantity || 0;
+                      const freeUnpackedForThisItem = Math.max(0, totalScannedForThisItem - totalPackedAcrossBoxes);
+
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.4)' }}>
+                          <td style={{ padding: '0.75rem 1.25rem', fontWeight: 600 }}>{item.title}</td>
+                          <td style={{ padding: '0.75rem 1rem', fontFamily: 'var(--font-mono)' }}>{item.barcode}</td>
+                          <td style={{ padding: '0.75rem 1.25rem', textAlign: 'right' }}>
+                            {!isLocked && !activeBox.isPacked ? (
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.35rem' }}>
+                                {/* Decrease by 1 */}
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => handleUpdateBoxItemQuantity(activeBox.boxNumber, item.itemId, item.quantity - 1)}
+                                  style={{ padding: '0.2rem 0.45rem', fontSize: '0.75rem', height: 26, minWidth: 26, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                  title="Уменьшить на 1 шт."
+                                >
+                                  <Minus size={12} />
+                                </button>
+
+                                <span style={{ minWidth: 42, textAlign: 'center', fontWeight: 700, color: 'var(--primary)' }}>
+                                  {item.quantity} шт.
+                                </span>
+
+                                {/* Increase by 1 */}
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => handleUpdateBoxItemQuantity(activeBox.boxNumber, item.itemId, item.quantity + 1)}
+                                  disabled={freeUnpackedForThisItem <= 0}
+                                  style={{
+                                    padding: '0.2rem 0.45rem',
+                                    fontSize: '0.75rem',
+                                    height: 26,
+                                    minWidth: 26,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    opacity: freeUnpackedForThisItem <= 0 ? 0.35 : 1
+                                  }}
+                                  title={freeUnpackedForThisItem <= 0 ? 'Все принятые единицы уже распределены' : 'Добавить +1 шт. в эту коробку'}
+                                >
+                                  <Plus size={12} />
+                                </button>
+
+                                {/* Remove item completely from box */}
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => handleRemoveItemFromBox(activeBox.boxNumber, item.itemId)}
+                                  style={{
+                                    padding: '0.2rem 0.45rem',
+                                    fontSize: '0.75rem',
+                                    height: 26,
+                                    minWidth: 26,
+                                    color: '#f43f5e',
+                                    borderColor: 'rgba(244,63,94,0.35)',
+                                    marginLeft: '0.4rem',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                  title="Выложить весь товар из коробки"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            ) : (
+                              <span style={{ fontWeight: 700, color: 'var(--primary)' }}>
+                                {item.quantity} шт.
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

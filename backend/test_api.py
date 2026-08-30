@@ -84,6 +84,27 @@ def test_full_api_workflow():
     updated_shipment = r.json()
     print(f"   ✅ Коробка добавлена! Всего коробок в поставке: {len(updated_shipment['boxes'])}")
 
+    item_id = shipment_with_items["items"][0]["id"]
+    # Попытка уложить больше, чем принято по сканеру (принято 1 шт., пробуем уложить 10)
+    r = client.post(f"/api/v1/shipments/{shipment_id}/boxes/1/pack", json={"itemId": item_id, "quantity": 10}, headers=headers)
+    assert r.status_code == 400
+    print("   ✅ Превышение доступного остатка успешно заблокировано (400 Bad Request)!")
+
+    # Укладываем ровно 1 шт.
+    r = client.post(f"/api/v1/shipments/{shipment_id}/boxes/1/pack", json={"itemId": item_id, "quantity": 1}, headers=headers)
+    assert r.status_code == 200
+    print("   ✅ 1 шт. успешно уложена в Коробку №1!")
+
+    # Проверка изменения количества внутри коробки
+    r = client.put(f"/api/v1/shipments/{shipment_id}/boxes/1/items/{item_id}", json={"quantity": 1}, headers=headers)
+    assert r.status_code == 200
+    print("   ✅ Изменение количества товара в коробке работает!")
+
+    # Проверка удаления товара из коробки
+    r = client.delete(f"/api/v1/shipments/{shipment_id}/boxes/1/items/{item_id}", headers=headers)
+    assert r.status_code == 200
+    print("   ✅ Удаление товара из коробки (возврат в остаток) работает!")
+
     print("\n🔍 6. Тестирование Актов выполненных работ (/api/v1/acts):")
     r = client.get("/api/v1/acts", headers=headers)
     assert r.status_code == 200

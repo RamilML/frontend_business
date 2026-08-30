@@ -118,3 +118,6 @@ class MoveItemRequest(BaseModel):
     toBoxNumber: int
     itemId: str
     quantity: int
+
+class UpdateBoxItemQuantityRequest(BaseModel):
+    quantity: int

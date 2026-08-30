@@ -782,7 +782,126 @@ export class ShipmentService {
       });
     }
 
-    if (shipment.status === 'draft' || shipment.status === 'receiving') {
+    if (shipment.status === 'draft' || shipment.status === 'receiving' || shipment.status === 'ready_to_ship') {
+      shipment.status = 'packing';
+    }
+
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+    return shipment;
+  }
+
+  /**
+   * Корректировка количества конкретного товара внутри коробки
+   */
+  public static async updateBoxItemQuantity(
+    shipmentId: string,
+    boxNumber: number,
+    itemId: string,
+    quantity: number
+  ): Promise<Shipment> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/boxes/${boxNumber}/items/${itemId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ quantity })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const list = this.loadStoredShipments();
+          const idx = list.findIndex((s) => s.id === shipmentId);
+          if (idx !== -1) {
+            list[idx] = data;
+            this.saveStoredShipments(list);
+          }
+          return data;
+        } else {
+          const err = await res.json();
+          throw new Error(err.detail || 'Ошибка изменения количества');
+        }
+      } catch (e: any) {
+        if (e.message && !e.message.includes('fetch')) throw e;
+        console.warn('Update box item server call failed, using local:', e);
+      }
+    }
+
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    const box = shipment.boxes.find((b) => b.boxNumber === boxNumber);
+    if (!box) throw new Error('Коробка не найдена');
+
+    if (quantity <= 0) {
+      box.items = box.items.filter((bi) => bi.itemId !== itemId);
+    } else {
+      const existingInBox = box.items.find((bi) => bi.itemId === itemId);
+      if (existingInBox) {
+        existingInBox.quantity = quantity;
+      }
+    }
+
+    if (shipment.status === 'ready_to_ship') {
+      shipment.status = 'packing';
+    }
+
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+    return shipment;
+  }
+
+  /**
+   * Полное удаление товара из коробки (возврат в неупакованный остаток)
+   */
+  public static async removeItemFromBox(
+    shipmentId: string,
+    boxNumber: number,
+    itemId: string
+  ): Promise<Shipment> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/boxes/${boxNumber}/items/${itemId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const list = this.loadStoredShipments();
+          const idx = list.findIndex((s) => s.id === shipmentId);
+          if (idx !== -1) {
+            list[idx] = data;
+            this.saveStoredShipments(list);
+          }
+          return data;
+        } else {
+          const err = await res.json();
+          throw new Error(err.detail || 'Ошибка удаления товара из коробки');
+        }
+      } catch (e: any) {
+        if (e.message && !e.message.includes('fetch')) throw e;
+        console.warn('Remove item from box server call failed, using local:', e);
+      }
+    }
+
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    const box = shipment.boxes.find((b) => b.boxNumber === boxNumber);
+    if (!box) throw new Error('Коробка не найдена');
+
+    box.items = box.items.filter((bi) => bi.itemId !== itemId);
+    if (shipment.status === 'ready_to_ship') {
       shipment.status = 'packing';
     }
 
