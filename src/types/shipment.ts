@@ -36,6 +36,8 @@ export interface ShipmentItem {
 export interface PackingBox {
   boxNumber: number; // 1, 2, 3...
   targetWarehouse: WBWarehouse;
+  isPacked?: boolean; // запечатана/заклеена ли коробка
+  sealedAt?: string;
   items: {
     itemId: string;
     barcode: string;

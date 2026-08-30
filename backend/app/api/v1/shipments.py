@@ -36,6 +36,8 @@ def format_shipment_response(s: ShipmentModel) -> ShipmentResponse:
         PackingBoxSchema(
             boxNumber=b.box_number,
             targetWarehouse=b.target_warehouse,
+            isPacked=bool(b.is_packed),
+            sealedAt=b.sealed_at,
             items=[
                 BoxItemSchema(
                     itemId=bi.get("itemId", ""),
@@ -446,4 +448,41 @@ def delete_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
     db.delete(box)
     db.commit()
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    return format_shipment_response(shipment)
+
+@router.put("/{id}/boxes/{boxNumber}/seal")
+def seal_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
+    box = db.query(PackingBoxModel).filter(
+        PackingBoxModel.shipment_id == id,
+        PackingBoxModel.box_number == boxNumber
+    ).first()
+    if not box:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
+
+    # Toggle sealed status
+    box.is_packed = not bool(box.is_packed)
+    box.sealed_at = datetime.utcnow() if box.is_packed else None
+    db.commit()
+
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    return format_shipment_response(shipment)
+
+@router.post("/{id}/finalize-packing")
+def finalize_packing(id: str, db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    # Mark all boxes as packed/sealed
+    for box in shipment.boxes:
+        box.is_packed = True
+        if not box.sealed_at:
+            box.sealed_at = datetime.utcnow()
+
+    # Move shipment status to ready_to_ship
+    shipment.status = "ready_to_ship"
+    shipment.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(shipment)
+
     return format_shipment_response(shipment)

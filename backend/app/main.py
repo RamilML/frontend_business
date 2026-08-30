@@ -7,8 +7,22 @@ from app.core.database import engine, Base, SessionLocal
 from app.services.seed_data import seed_database
 from app.api.v1.router import api_v1_router
 
+from sqlalchemy import text
+
 # Гарантированное создание таблиц базы данных
 Base.metadata.create_all(bind=engine)
+
+# Безопасная автомиграция колонок SQLite
+with engine.connect() as conn:
+    try:
+        conn.execute(text("ALTER TABLE packing_boxes ADD COLUMN is_packed BOOLEAN DEFAULT 0"))
+    except Exception:
+        pass
+    try:
+        conn.execute(text("ALTER TABLE packing_boxes ADD COLUMN sealed_at DATETIME"))
+    except Exception:
+        pass
+    conn.commit()
 
 def init_db():
     db = SessionLocal()

@@ -66,11 +66,13 @@ def test_full_api_workflow():
     assert r.status_code == 200
     shipments = r.json()
     assert len(shipments) > 0
-    shipment_id = shipments[0]["id"]
-    print(f"   ✅ Список поставок OK: Поставка № {shipments[0]['shipmentNumber']} (Склады WB: {shipments[0]['targetWarehouses']})")
+    shipment_with_items = next((s for s in shipments if len(s["items"]) > 0), shipments[0])
+    shipment_id = shipment_with_items["id"]
+    test_barcode = shipment_with_items["items"][0]["barcode"] if len(shipment_with_items["items"]) > 0 else "4601234567890"
+    print(f"   ✅ Список поставок OK: Поставка № {shipment_with_items['shipmentNumber']} (Склады WB: {shipment_with_items['targetWarehouses']})")
 
     # Сканирование штрихкода
-    r = client.post(f"/api/v1/shipments/{shipment_id}/scan", json={"barcode": "4601234567890"}, headers=headers)
+    r = client.post(f"/api/v1/shipments/{shipment_id}/scan", json={"barcode": test_barcode}, headers=headers)
     assert r.status_code == 200
     scan_res = r.json()
     assert scan_res["success"] is True

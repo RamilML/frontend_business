@@ -889,4 +889,88 @@ export class ShipmentService {
     this.saveStoredShipments(list);
     return shipment;
   }
+
+  /**
+   * Запечатывание / распечатывание коробки
+   */
+  public static async sealBox(shipmentId: string, boxNumber: number): Promise<Shipment> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/boxes/${boxNumber}/seal`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const list = this.loadStoredShipments();
+          const idx = list.findIndex((s) => s.id === shipmentId);
+          if (idx !== -1) {
+            list[idx] = data;
+            this.saveStoredShipments(list);
+          }
+          return data;
+        }
+      } catch (e) {
+        console.warn('Seal box server call failed:', e);
+      }
+    }
+
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    const box = shipment.boxes.find((b) => b.boxNumber === boxNumber);
+    if (box) {
+      box.isPacked = !box.isPacked;
+      box.sealedAt = box.isPacked ? new Date().toISOString() : undefined;
+      shipment.updatedAt = new Date().toISOString();
+      this.saveStoredShipments(list);
+    }
+    return shipment;
+  }
+
+  /**
+   * Завершение упаковки всей поставки (перевод в ready_to_ship)
+   */
+  public static async finalizePacking(shipmentId: string): Promise<Shipment> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/finalize-packing`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const list = this.loadStoredShipments();
+          const idx = list.findIndex((s) => s.id === shipmentId);
+          if (idx !== -1) {
+            list[idx] = data;
+            this.saveStoredShipments(list);
+          }
+          return data;
+        }
+      } catch (e) {
+        console.warn('Finalize packing server call failed:', e);
+      }
+    }
+
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    shipment.boxes.forEach((b) => {
+      b.isPacked = true;
+      if (!b.sealedAt) b.sealedAt = new Date().toISOString();
+    });
+    shipment.status = 'ready_to_ship';
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+    return shipment;
+  }
 }

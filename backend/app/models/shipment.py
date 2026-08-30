@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, JSON
+from sqlalchemy import Column, String, DateTime, Integer, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -13,7 +13,7 @@ class ShipmentModel(Base):
     client_id = Column(String, nullable=False, index=True)
     client_name = Column(String, nullable=False)
     target_warehouses = Column(JSON, default=list) # e.g. ["Коледино", "Тула"]
-    status = Column(String, default="receiving") # draft, receiving, packing, completed, shipped
+    status = Column(String, default="receiving") # draft, receiving, packing, completed, shipped, ready_to_ship
     operator_id = Column(String, nullable=True)
     operator_name = Column(String, nullable=True)
     
@@ -48,6 +48,8 @@ class PackingBoxModel(Base):
     shipment_id = Column(String, ForeignKey("shipments.id"), nullable=False, index=True)
     box_number = Column(Integer, nullable=False)
     target_warehouse = Column(String, nullable=False) # e.g. "Коледино"
+    is_packed = Column(Boolean, default=False)
+    sealed_at = Column(DateTime, nullable=True)
     items = Column(JSON, default=list) # list of {itemId, barcode, title, quantity}
 
     shipment = relationship("ShipmentModel", back_populates="boxes")

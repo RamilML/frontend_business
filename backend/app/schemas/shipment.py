@@ -37,6 +37,8 @@ class BoxItemSchema(BaseModel):
 class PackingBoxSchema(BaseModel):
     boxNumber: int
     targetWarehouse: str
+    isPacked: Optional[bool] = False
+    sealedAt: Optional[datetime] = None
     items: List[BoxItemSchema] = []
 
 class ShipmentCreate(BaseModel):
