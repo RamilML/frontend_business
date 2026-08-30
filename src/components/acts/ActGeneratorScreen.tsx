@@ -137,7 +137,7 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
     setServiceItems((prev) => [...prev, newItem]);
   };
 
-  // Add custom service line
+  // Add custom service line (adds to top of list for instant visibility)
   const handleAddCustomService = () => {
     const newItem: ActServiceItem = {
       id: `act_srv_custom_${Date.now()}`,
@@ -150,7 +150,7 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
       enabled: true,
       isCustom: true
     };
-    setServiceItems((prev) => [...prev, newItem]);
+    setServiceItems((prev) => [newItem, ...prev]);
   };
 
   const handleDeleteServiceLine = (id: string) => {
@@ -435,6 +435,20 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
                     </td>
                   </tr>
                 ))}
+
+                {/* Add Row Button at bottom */}
+                <tr className="no-print" style={{ background: 'rgba(15, 23, 42, 0.4)' }}>
+                  <td colSpan={6} style={{ padding: '0.6rem 1rem' }}>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={handleAddCustomService}
+                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                    >
+                      <PlusCircle size={14} color="var(--primary)" /> Добавить произвольную услугу в Акт
+                    </button>
+                  </td>
+                </tr>
 
                 {/* TOTAL SUM ROW */}
                 <tr style={{ background: 'rgba(245, 158, 11, 0.1)', borderTop: '2px solid var(--primary)' }}>
