@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   ArrowLeft,
   Copy,
-  Calculator
+  Calculator,
+  RefreshCw
 } from 'lucide-react';
 
 interface Props {
@@ -155,6 +156,14 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
 
   const handleDeleteServiceLine = (id: string) => {
     setServiceItems((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const handleResetToDefaultServices = () => {
+    if (window.confirm('Восстановить базовый перечень из 13 услуг фулфилмента?')) {
+      const totalItems = shipment ? shipment.items.reduce((a, c) => a + c.scannedQuantity, 0) || 50 : 50;
+      const totalBoxes = shipment ? shipment.boxes.length || 2 : 2;
+      setServiceItems(ActService.getInitialServicesForShipment(totalItems, totalBoxes));
+    }
   };
 
   // Calculate TOTAL SUM of all active enabled services
@@ -299,14 +308,25 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Calculator size={18} color="var(--primary)" /> Перечень выполненных услуг (13 стандартных пунктов + кастом)
             </h3>
-            <button
-              type="button"
-              className="btn-primary no-print"
-              onClick={handleAddCustomService}
-              style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', width: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-            >
-              <PlusCircle size={14} /> + Добавить услугу
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="btn-secondary no-print"
+                onClick={handleResetToDefaultServices}
+                style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                title="Восстановить стандартные 13 услуг"
+              >
+                <RefreshCw size={13} /> 13 базовых услуг
+              </button>
+              <button
+                type="button"
+                className="btn-primary no-print"
+                onClick={handleAddCustomService}
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', width: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+              >
+                <PlusCircle size={14} /> + Добавить услугу
+              </button>
+            </div>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -425,17 +445,15 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
                         >
                           <Copy size={12} />
                         </button>
-                        {item.isCustom && (
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={() => handleDeleteServiceLine(item.id)}
-                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem', color: '#f43f5e' }}
-                            title="Удалить строку"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => handleDeleteServiceLine(item.id)}
+                          style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem', color: '#f43f5e' }}
+                          title="Удалить услугу из акта"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </div>
                     </td>
                   </tr>
