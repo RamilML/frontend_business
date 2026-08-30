@@ -323,11 +323,38 @@ export class ShipmentService {
           message: `Отсканировано: ${item.title} (${item.scannedQuantity}/${item.plannedQuantity} шт.)`
         };
       } else {
+        // Поиск товара в каталоге среди всех когда-либо добавленных поставок
+        let catalogItem: ShipmentItem | undefined;
+        for (const s of list) {
+          const found = s.items.find(
+            (it) =>
+              it.barcode.trim().toLowerCase() === cleanBarcode.toLowerCase() ||
+              it.sku.trim().toLowerCase() === cleanBarcode.toLowerCase()
+          );
+          if (found) {
+            catalogItem = found;
+            break;
+          }
+        }
+
         audioSynth.playErrorBeep();
         return {
           success: false,
-          message: `Штрихкод ${cleanBarcode} не найден в плановом списке этой поставки.`,
-          isNewItem: true
+          message: catalogItem
+            ? `Товар распознан из каталога: ${catalogItem.title}`
+            : `Штрихкод ${cleanBarcode} не найден в плановом списке этой поставки.`,
+          isNewItem: true,
+          catalogProduct: catalogItem
+            ? {
+                barcode: catalogItem.barcode,
+                title: catalogItem.title,
+                sku: catalogItem.sku,
+                article: catalogItem.article,
+                size: catalogItem.size,
+                brand: catalogItem.brand,
+                category: catalogItem.category
+              }
+            : undefined
         };
       }
     }
@@ -349,8 +376,9 @@ export class ShipmentService {
         audioSynth.playErrorBeep();
         return {
           success: false,
-          message: data.message || data.detail || `Штрихкод ${cleanBarcode} не найден в поставке`,
-          isNewItem: data.isNewItem ?? true
+          message: data.message || `Штрихкод ${cleanBarcode} не найден`,
+          isNewItem: true,
+          catalogProduct: data.catalogProduct
         };
       }
 

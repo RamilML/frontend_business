@@ -20,7 +20,8 @@ import {
   Edit2,
   Trash2,
   X,
-  Settings
+  Settings,
+  Sparkles
 } from 'lucide-react';
 
 interface Props {
@@ -42,7 +43,10 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
   const [newItemTitle, setNewItemTitle] = useState('');
   const [newItemSku, setNewItemSku] = useState('');
+  const [newItemArticle, setNewItemArticle] = useState('');
+  const [newItemSize, setNewItemSize] = useState('');
   const [newItemPlannedQty, setNewItemPlannedQty] = useState<number>(1);
+  const [isFromCatalog, setIsFromCatalog] = useState<boolean>(false);
 
   // Edit Item Modal state
   const [editingItem, setEditingItem] = useState<ShipmentItem | null>(null);
@@ -139,8 +143,19 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
       triggerFlash('error');
       if (res.isNewItem) {
         setUnknownBarcode(cleanCode);
-        setNewItemTitle('');
-        setNewItemSku(`SKU-${cleanCode}`);
+        if (res.catalogProduct) {
+          setNewItemTitle(res.catalogProduct.title);
+          setNewItemSku(res.catalogProduct.sku || `SKU-${cleanCode}`);
+          setNewItemArticle(res.catalogProduct.article || '');
+          setNewItemSize(res.catalogProduct.size || '');
+          setIsFromCatalog(true);
+        } else {
+          setNewItemTitle('');
+          setNewItemSku(`SKU-${cleanCode}`);
+          setNewItemArticle('');
+          setNewItemSize('');
+          setIsFromCatalog(false);
+        }
         setNewItemPlannedQty(1);
       }
     }
@@ -161,11 +176,16 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
       const titleToAdd = newItemTitle.trim();
       const plannedToAdd = Math.max(1, Number(newItemPlannedQty) || 1);
       const skuToAdd = newItemSku.trim() || `SKU-${barcodeToAdd}`;
+      const articleToAdd = newItemArticle.trim() || undefined;
+      const sizeToAdd = newItemSize.trim() || undefined;
 
       setUnknownBarcode(null);
       setNewItemTitle('');
       setNewItemSku('');
+      setNewItemArticle('');
+      setNewItemSize('');
       setNewItemPlannedQty(1);
+      setIsFromCatalog(false);
 
       try {
         const createdItem = await ShipmentService.addItemToShipment(shipmentId, {
@@ -174,6 +194,16 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
           plannedQuantity: plannedToAdd,
           sku: skuToAdd
         });
+
+        // If article or size was set, persist it as well
+        if (articleToAdd || sizeToAdd) {
+          await ShipmentService.editShipmentItem(shipmentId, createdItem.id, {
+            article: articleToAdd,
+            size: sizeToAdd
+          });
+          createdItem.article = articleToAdd;
+          createdItem.size = sizeToAdd;
+        }
 
         // Instantly update state in React
         setShipment((prev) => {
@@ -625,9 +655,29 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
               <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Неизвестный штрихкод в поставке</h3>
             </div>
             
-            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              Штрихкод <b style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary)', background: 'rgba(255,255,255,0.08)', padding: '0.2rem 0.4rem', borderRadius: 4 }}>{unknownBarcode}</b> не найден в плане этой поставки. Введите данные, чтобы принять его:
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Штрихкод <b style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary)', background: 'rgba(255,255,255,0.08)', padding: '0.2rem 0.4rem', borderRadius: 4 }}>{unknownBarcode}</b> не найден в плане этой поставки.
             </p>
+
+            {isFromCatalog && (
+              <div
+                style={{
+                  background: 'rgba(56, 189, 248, 0.12)',
+                  border: '1px solid rgba(56, 189, 248, 0.35)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.65rem 0.85rem',
+                  marginBottom: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.6rem',
+                  fontSize: '0.85rem',
+                  color: '#38bdf8'
+                }}
+              >
+                <Sparkles size={18} color="#38bdf8" />
+                <span><b>Товар распознан из каталога!</b> Данные заполнены автоматически. Нажмите «Добавить и принять», чтобы внести его в поставку.</span>
+              </div>
+            )}
 
             <form onSubmit={handleAddNewUnlistedItem}>
               <div className="form-group">
@@ -652,6 +702,30 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                     value={newItemSku}
                     onChange={(e) => setNewItemSku(e.target.value)}
                     placeholder="Например: DRESS-BEG-42"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Артикул WB</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={newItemArticle}
+                    onChange={(e) => setNewItemArticle(e.target.value)}
+                    placeholder="Например: WB-FUT-01"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Размер</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={newItemSize}
+                    onChange={(e) => setNewItemSize(e.target.value)}
+                    placeholder="Например: M / 44 / 164"
                   />
                 </div>
 

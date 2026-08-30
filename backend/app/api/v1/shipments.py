@@ -7,10 +7,10 @@ from app.core.database import get_db
 from app.models.shipment import ShipmentModel, ShipmentItemModel, PackingBoxModel
 from app.models.client import ClientModel
 from app.schemas.shipment import (
-    ShipmentCreate, ShipmentResponse, ShipmentItemResponse, ShipmentItemBase,
-    ScanRequest, ScanResponse, UpdateItemQtyRequest,
+    ShipmentCreate, ShipmentUpdate, ShipmentResponse, ShipmentItemResponse, ShipmentItemBase,
+    ScanRequest, ScanResponse, UpdateItemQtyRequest, UpdateItemDetailsRequest,
     CreateBoxRequest, UpdateBoxWarehouseRequest, PackItemRequest, MoveItemRequest,
-    PackingBoxSchema, BoxItemSchema
+    PackingBoxSchema, BoxItemSchema, CatalogProductSchema
 )
 
 router = APIRouter(prefix="/shipments", tags=["Shipments"])
@@ -190,10 +190,30 @@ def process_barcode_scan(id: str, req: ScanRequest = Body(...), db: Session = De
             message=f"Отсканировано: {item.title} ({item.scanned_quantity}/{item.planned_quantity} шт.)"
         )
     else:
+        # Поиск информации о товаре в глобальной базе / прошлых поставках
+        catalog_item = db.query(ShipmentItemModel).filter(
+            (ShipmentItemModel.barcode == barcode) | (ShipmentItemModel.sku.ilike(barcode))
+        ).order_by(ShipmentItemModel.created_at.desc() if hasattr(ShipmentItemModel, 'created_at') else ShipmentItemModel.id.desc()).first()
+
+        catalog_product = None
+        if catalog_item:
+            catalog_product = CatalogProductSchema(
+                barcode=catalog_item.barcode,
+                title=catalog_item.title,
+                sku=catalog_item.sku,
+                article=catalog_item.article,
+                size=catalog_item.size,
+                brand=catalog_item.brand,
+                category=catalog_item.category
+            )
+
+        msg = f"Товар распознан из каталога: {catalog_item.title}" if catalog_item else f"Штрихкод {barcode} не найден в плане этой поставки."
+
         return ScanResponse(
             success=False,
-            message=f"Штрихкод {barcode} не найден в плановом списке этой поставки.",
-            isNewItem=True
+            message=msg,
+            isNewItem=True,
+            catalogProduct=catalog_product
         )
 
 @router.put("/{id}/items/{itemId}", response_model=ShipmentItemResponse)

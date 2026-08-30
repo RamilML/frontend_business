@@ -73,4 +73,13 @@ export interface ScanResult {
   item?: ShipmentItem;
   message: string;
   isNewItem?: boolean;
+  catalogProduct?: {
+    barcode: string;
+    title: string;
+    sku?: string;
+    article?: string;
+    size?: string;
+    brand?: string;
+    category?: string;
+  };
 }

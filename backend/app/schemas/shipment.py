@@ -74,11 +74,21 @@ class ShipmentResponse(BaseModel):
 class ScanRequest(BaseModel):
     barcode: str
 
+class CatalogProductSchema(BaseModel):
+    barcode: str
+    title: str
+    sku: Optional[str] = None
+    article: Optional[str] = None
+    size: Optional[str] = None
+    brand: Optional[str] = None
+    category: Optional[str] = None
+
 class ScanResponse(BaseModel):
     success: bool
     item: Optional[ShipmentItemResponse] = None
     message: str
     isNewItem: Optional[bool] = False
+    catalogProduct: Optional[CatalogProductSchema] = None
 
 class UpdateItemQtyRequest(BaseModel):
     scannedQuantity: Optional[int] = None
