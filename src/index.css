@@ -126,9 +126,10 @@ body {
 
 .input-icon {
   position: absolute;
-  left: 1rem;
+  left: 0.85rem;
   color: var(--text-muted);
   pointer-events: none;
+  z-index: 2;
 }
 
 .form-input {
@@ -141,6 +142,23 @@ body {
   font-size: 0.95rem;
   font-family: var(--font-sans);
   transition: all 0.2s ease;
+}
+
+select.form-input {
+  padding-left: 1rem;
+  padding-right: 2.5rem;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  background-size: 1rem;
+}
+
+.input-with-icon select.form-input {
+  padding-left: 2.75rem !important;
 }
 
 /* Полностью скрываем стандартные браузерные стрелки у числовых полей ввода */
