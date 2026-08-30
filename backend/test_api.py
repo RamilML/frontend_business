@@ -89,8 +89,9 @@ def test_full_api_workflow():
     print(f"   ✅ Реестр актов OK: Найдено {len(acts)} актов (первый: {acts[0]['actNumber']}, сумма: {acts[0]['totalSum']})")
 
     # Создание Акта
+    import uuid
     new_act_payload = {
-        "actNumber": "АКТ-2026-0830-TEST",
+        "actNumber": f"АКТ-TEST-{uuid.uuid4().hex[:6]}",
         "date": "2026-08-30",
         "operatorName": "Алексей Смирнов",
         "clientId": created_client["id"],

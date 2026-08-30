@@ -171,6 +171,31 @@ def update_item_quantity(id: str, itemId: str, req: UpdateItemQtyRequest, db: Se
     db.commit()
     return {"success": True, "scannedQuantity": item.scanned_quantity}
 
+@router.post("/{id}/items", response_model=ShipmentItemResponse, status_code=status.HTTP_201_CREATED)
+def add_item_to_shipment(id: str, it: ShipmentItemBase, db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    item_model = ShipmentItemModel(
+        shipment_id=shipment.id,
+        barcode=it.barcode,
+        sku=it.sku or f"SKU-{it.barcode}",
+        title=it.title,
+        category=it.category,
+        article=it.article,
+        size=it.size,
+        brand=it.brand,
+        planned_quantity=it.plannedQuantity or 10,
+        scanned_quantity=1,
+        last_scanned_at=datetime.utcnow()
+    )
+    db.add(item_model)
+    shipment.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(item_model)
+    return item_model
+
 @router.post("/{id}/boxes")
 def create_box(id: str, req: CreateBoxRequest, db: Session = Depends(get_db)):
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()

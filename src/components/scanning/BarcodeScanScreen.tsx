@@ -1,24 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Shipment, ShipmentItem, ScanResult } from '../../types/shipment';
+import { Shipment, ScanResult } from '../../types/shipment';
 import { ShipmentService } from '../../services/shipmentService';
 import { CameraScannerModal } from './CameraScannerModal';
 import { PackingScreen } from '../packing/PackingScreen';
 import {
   Barcode,
-  Camera,
   CheckCircle2,
   AlertTriangle,
+  ArrowLeft,
   Plus,
   Minus,
-  ArrowLeft,
-  Volume2,
-  Sparkles,
-  Search,
-  Package,
-  Layers,
-  Truck,
   Box,
-  X
+  Truck,
+  Layers,
+  Camera,
+  PlusCircle,
+  HelpCircle
 } from 'lucide-react';
 
 interface Props {
@@ -30,13 +27,9 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [barcodeInput, setBarcodeInput] = useState('');
-  const [isPackingView, setIsPackingView] = useState(false);
-  
-  // Flash feedback animation state ('success' | 'error' | null)
-  const [flashType, setFlashType] = useState<'success' | 'error' | null>(null);
   const [lastScanResult, setLastScanResult] = useState<ScanResult | null>(null);
-
-  // Modals
+  const [flashType, setFlashType] = useState<'success' | 'error' | null>(null);
+  const [isPackingView, setIsPackingView] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
   const [newItemTitle, setNewItemTitle] = useState('');
@@ -45,40 +38,40 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const keyBufferRef = useRef<string>('');
   const lastKeyTimeRef = useRef<number>(Date.now());
 
-  const loadShipment = async () => {
-    setIsLoading(true);
+  const loadShipment = async (showLoading = false) => {
+    if (showLoading) setIsLoading(true);
     try {
       const data = await ShipmentService.getShipmentById(shipmentId);
-      setShipment(data);
-    } catch {
-      // Ignore
+      if (data) {
+        setShipment(data);
+      }
+    } catch (e) {
+      console.warn('Error loading shipment:', e);
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadShipment();
+    loadShipment(true);
   }, [shipmentId]);
 
   // Global Hardware TSD Scanner key listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in a modal input or text input explicitly
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
         return;
       }
 
       const now = Date.now();
-      // If gap between keys > 100ms, reset buffer (human typing vs barcode scanner)
-      if (now - lastKeyTimeRef.current > 100) {
+      if (now - lastKeyTimeRef.current > 400) {
         keyBufferRef.current = '';
       }
       lastKeyTimeRef.current = now;
 
       if (e.key === 'Enter') {
-        if (keyBufferRef.current.trim().length > 3) {
+        if (keyBufferRef.current.trim().length >= 3) {
           executeBarcodeScan(keyBufferRef.current.trim());
           keyBufferRef.current = '';
         }
@@ -89,7 +82,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [shipmentId]);
+  }, [shipmentId, shipment]);
 
   const triggerFlash = (type: 'success' | 'error') => {
     setFlashType(type);
@@ -97,17 +90,34 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   };
 
   const executeBarcodeScan = async (code: string) => {
-    if (!code) return;
-    const res = await ShipmentService.processBarcodeScan(shipmentId, code);
+    const cleanCode = code.trim();
+    if (!cleanCode) return;
+
+    // Call service to process scan
+    const res = await ShipmentService.processBarcodeScan(shipmentId, cleanCode);
     setLastScanResult(res);
 
-    if (res.success) {
+    if (res.success && res.item) {
       triggerFlash('success');
-      loadShipment();
+      const updatedItem = res.item;
+      // Optimistic update in UI
+      setShipment((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((it) =>
+            it.barcode === updatedItem.barcode || it.sku.toLowerCase() === cleanCode.toLowerCase()
+              ? { ...it, scannedQuantity: updatedItem.scannedQuantity, lastScannedAt: new Date().toISOString() }
+              : it
+          )
+        };
+      });
+      // Background sync
+      loadShipment(false);
     } else {
       triggerFlash('error');
       if (res.isNewItem) {
-        setUnknownBarcode(code);
+        setUnknownBarcode(cleanCode);
       }
     }
   };
@@ -130,15 +140,31 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
       });
       setUnknownBarcode(null);
       setNewItemTitle('');
-      loadShipment();
+      loadShipment(false);
     }
   };
 
+  // Immediate optimistic + / - quantity adjustment
   const handleUpdateQuantity = async (itemId: string, currentQty: number, delta: number) => {
-    const newQty = currentQty + delta;
-    if (newQty < 0) return;
-    await ShipmentService.updateItemQuantity(shipmentId, itemId, newQty);
-    loadShipment();
+    const newQty = Math.max(0, currentQty + delta);
+    
+    // 1. Instantly update React state so the UI reflects the click with 0 ms lag
+    setShipment((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: prev.items.map((it) =>
+          it.id === itemId ? { ...it, scannedQuantity: newQty, lastScannedAt: new Date().toISOString() } : it
+        )
+      };
+    });
+
+    // 2. Persist to storage / server
+    try {
+      await ShipmentService.updateItemQuantity(shipmentId, itemId, newQty);
+    } catch (e) {
+      console.warn('Update quantity error:', e);
+    }
   };
 
   if (isLoading || !shipment) {
@@ -156,7 +182,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
         shipmentId={shipmentId}
         onBack={() => {
           setIsPackingView(false);
-          loadShipment();
+          loadShipment(false);
         }}
       />
     );
@@ -338,7 +364,9 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                       </td>
 
                       <td style={{ padding: '0.85rem 1rem', fontFamily: 'var(--font-mono)' }}>
-                        <div>{item.barcode}</div>
+                        <div style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => executeBarcodeScan(item.barcode)} title="Нажмите для быстрой имитации сканирования">
+                          {item.barcode}
+                        </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>{item.sku}</div>
                       </td>
 
@@ -361,17 +389,27 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                       <td style={{ padding: '0.85rem 1.25rem', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end', alignItems: 'center' }}>
                           <button
+                            type="button"
                             className="btn-secondary"
-                            onClick={() => handleUpdateQuantity(item.id, item.scannedQuantity, -1)}
-                            style={{ padding: '0.25rem 0.5rem' }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleUpdateQuantity(item.id, item.scannedQuantity, -1);
+                            }}
+                            style={{ padding: '0.35rem 0.6rem', cursor: 'pointer' }}
                             title="Уменьшить количество (-1)"
                           >
                             <Minus size={14} />
                           </button>
                           <button
+                            type="button"
                             className="btn-secondary"
-                            onClick={() => handleUpdateQuantity(item.id, item.scannedQuantity, 1)}
-                            style={{ padding: '0.25rem 0.5rem', borderColor: 'var(--primary)' }}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleUpdateQuantity(item.id, item.scannedQuantity, 1);
+                            }}
+                            style={{ padding: '0.35rem 0.6rem', borderColor: 'var(--primary)', cursor: 'pointer' }}
                             title="Добавить количество (+1)"
                           >
                             <Plus size={14} />
@@ -388,43 +426,41 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
 
       </div>
 
-      {/* Modal for Unregistered Barcode */}
+      {/* Unlisted Barcode Modal: When an unexpected item is scanned */}
       {unknownBarcode && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: 480 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f43f5e' }}>
-                <AlertTriangle size={20} /> Неизвестный штрихкод
-              </h3>
-              <button type="button" className="btn-secondary" onClick={() => setUnknownBarcode(null)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
-              Штрихкод <b style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary)' }}>{unknownBarcode}</b> не найден в плановом списке этой поставки.
-            </div>
+          <div className="modal-content" style={{ maxWidth: 450 }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f59e0b' }}>
+              <HelpCircle size={22} /> Неизвестный штрихкод в поставке
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Штрихкод <b style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary)' }}>{unknownBarcode}</b> не был запланирован для этой поставки. Вы хотите добавить его прямо сейчас?
+            </p>
 
             <form onSubmit={handleAddNewUnlistedItem}>
               <div className="form-group">
-                <label className="form-label">Наименование нового товара *</label>
+                <label className="form-label">Наименование товара</label>
                 <input
                   type="text"
                   className="form-input"
                   value={newItemTitle}
                   onChange={(e) => setNewItemTitle(e.target.value)}
-                  placeholder="Например: Платье летнее белое L"
-                  style={{ paddingLeft: '0.75rem' }}
+                  placeholder="Например: Платье летнее бежевое 42"
+                  autoFocus
                   required
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
-                <button type="button" className="btn-secondary" onClick={() => setUnknownBarcode(null)}>
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setUnknownBarcode(null)}
+                >
                   Отмена
                 </button>
-                <button type="submit" className="btn-primary" style={{ width: 'auto' }}>
-                  <Plus size={16} /> Добавить в приёмку
+                <button type="submit" className="btn-primary">
+                  <PlusCircle size={16} /> Принять товар в поставку
                 </button>
               </div>
             </form>
@@ -432,13 +468,13 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
         </div>
       )}
 
-      {/* Camera Modal */}
+      {/* Camera Video Stream Modal for Mobile */}
       <CameraScannerModal
         isOpen={isCameraOpen}
         onClose={() => setIsCameraOpen(false)}
-        onScan={(code) => {
+        onScan={(scannedCode: string) => {
           setIsCameraOpen(false);
-          executeBarcodeScan(code);
+          executeBarcodeScan(scannedCode);
         }}
       />
     </div>

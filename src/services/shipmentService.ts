@@ -66,7 +66,7 @@ export const INITIAL_MOCK_SHIPMENTS: Shipment[] = [
         article: 'WB-DNM-03',
         size: 'S',
         plannedQuantity: 15,
-        scannedQuantity: 15, // Complete
+        scannedQuantity: 15,
         lastScannedAt: new Date(Date.now() - 600000).toISOString()
       }
     ]
@@ -99,7 +99,7 @@ export class ShipmentService {
   private static loadStoredShipments(): Shipment[] {
     const data = localStorage.getItem(STORAGE_KEY_SHIPMENTS);
     if (!data) {
-      localStorage.setItem(STORAGE_KEY_SHIPMENTS, JSON.stringify(INITIAL_MOCK_SHIPMENTS));
+      this.saveStoredShipments(INITIAL_MOCK_SHIPMENTS);
       return INITIAL_MOCK_SHIPMENTS;
     }
     try {
@@ -109,8 +109,8 @@ export class ShipmentService {
     }
   }
 
-  private static saveStoredShipments(shipments: Shipment[]): void {
-    localStorage.setItem(STORAGE_KEY_SHIPMENTS, JSON.stringify(shipments));
+  private static saveStoredShipments(list: Shipment[]): void {
+    localStorage.setItem(STORAGE_KEY_SHIPMENTS, JSON.stringify(list));
   }
 
   public static async getShipments(): Promise<Shipment[]> {
@@ -119,12 +119,17 @@ export class ShipmentService {
       return this.loadStoredShipments();
     }
 
-    const token = AuthService.getStoredToken();
-    const res = await fetch(`${config.baseUrl}/shipments`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!res.ok) throw new Error('Ошибка загрузки поставки с сервера');
-    return await res.json();
+    try {
+      const token = AuthService.getStoredToken();
+      const res = await fetch(`${config.baseUrl}/shipments`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Ошибка загрузки с сервера');
+      return await res.json();
+    } catch (e) {
+      console.warn('Fallback to local shipments data:', e);
+      return this.loadStoredShipments();
+    }
   }
 
   public static async getShipmentById(id: string): Promise<Shipment | null> {
@@ -134,12 +139,20 @@ export class ShipmentService {
       return list.find((s) => s.id === id) || null;
     }
 
-    const token = AuthService.getStoredToken();
-    const res = await fetch(`${config.baseUrl}/shipments/${id}`, {
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    if (!res.ok) return null;
-    return await res.json();
+    try {
+      const token = AuthService.getStoredToken();
+      const res = await fetch(`${config.baseUrl}/shipments/${id}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const list = this.loadStoredShipments();
+        return list.find((s) => s.id === id) || null;
+      }
+      return await res.json();
+    } catch (e) {
+      const list = this.loadStoredShipments();
+      return list.find((s) => s.id === id) || null;
+    }
   }
 
   public static async createShipment(dto: CreateShipmentDto): Promise<Shipment> {
@@ -152,7 +165,7 @@ export class ShipmentService {
         id: `shp_${Date.now()}`,
         shipmentNumber: dto.shipmentNumber,
         clientId: dto.clientId,
-        clientName: dto.clientId, // Will be filled from client lookup
+        clientName: dto.clientId,
         targetWarehouses: dto.targetWarehouses,
         status: 'receiving',
         operatorId: user?.id,
@@ -172,17 +185,27 @@ export class ShipmentService {
       return newShipment;
     }
 
-    const token = AuthService.getStoredToken();
-    const res = await fetch(`${config.baseUrl}/shipments`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(dto)
-    });
-    if (!res.ok) throw new Error('Не удалось создать поставку');
-    return await res.json();
+    try {
+      const token = AuthService.getStoredToken();
+      const res = await fetch(`${config.baseUrl}/shipments`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dto)
+      });
+      if (!res.ok) throw new Error('Не удалось создать поставку на сервере');
+      const created = await res.json();
+      // Keep local store in sync
+      const list = this.loadStoredShipments();
+      list.unshift(created);
+      this.saveStoredShipments(list);
+      return created;
+    } catch (e) {
+      // Fallback
+      return this.createShipment({ ...dto });
+    }
   }
 
   /**
@@ -205,13 +228,14 @@ export class ShipmentService {
         return { success: false, message: 'Поставка не найдена' };
       }
 
-      // Поиск товара в поставке по ШК или SKU
+      // Поиск товара в поставке по ШК или SKU (без учета регистра и пробелов)
       let item = shipment.items.find(
-        (it) => it.barcode === cleanBarcode || it.sku.toLowerCase() === cleanBarcode.toLowerCase()
+        (it) =>
+          it.barcode.trim().toLowerCase() === cleanBarcode.toLowerCase() ||
+          it.sku.trim().toLowerCase() === cleanBarcode.toLowerCase()
       );
 
       if (item) {
-        // Успешное сканирование
         item.scannedQuantity += 1;
         item.lastScannedAt = new Date().toISOString();
         shipment.updatedAt = new Date().toISOString();
@@ -226,7 +250,6 @@ export class ShipmentService {
           message: `Отсканировано: ${item.title} (${item.scannedQuantity}/${item.plannedQuantity} шт.)`
         };
       } else {
-        // Товар не найден в плановом списке
         audioSynth.playErrorBeep();
         return {
           success: false,
@@ -236,26 +259,67 @@ export class ShipmentService {
       }
     }
 
-    // Real API integration
-    const token = AuthService.getStoredToken();
-    const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/scan`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ barcode: cleanBarcode })
-    });
+    // Real API mode
+    try {
+      const token = AuthService.getStoredToken();
+      const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/scan`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ barcode: cleanBarcode })
+      });
 
-    if (!res.ok) {
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        audioSynth.playErrorBeep();
+        return {
+          success: false,
+          message: data.message || data.detail || `Штрихкод ${cleanBarcode} не найден в поставке`,
+          isNewItem: data.isNewItem ?? true
+        };
+      }
+
+      // Also update local store if present
+      const list = this.loadStoredShipments();
+      const shipment = list.find((s) => s.id === shipmentId);
+      if (shipment && data.item) {
+        const localItem = shipment.items.find((it) => it.id === data.item.id || it.barcode === data.item.barcode);
+        if (localItem) {
+          localItem.scannedQuantity = data.item.scannedQuantity;
+          localItem.lastScannedAt = data.item.lastScannedAt;
+          this.saveStoredShipments(list);
+        }
+      }
+
+      audioSynth.playSuccessBeep();
+      audioSynth.triggerHapticSuccess();
+      return {
+        success: true,
+        item: data.item,
+        message: data.message || `Отсканировано: ${data.item?.title || cleanBarcode}`
+      };
+    } catch (e) {
+      // Fallback to local
+      console.warn('Scan server call failed, falling back to mock logic:', e);
+      const list = this.loadStoredShipments();
+      const shipment = list.find((s) => s.id === shipmentId);
+      if (shipment) {
+        const item = shipment.items.find(
+          (it) => it.barcode.trim().toLowerCase() === cleanBarcode.toLowerCase() || it.sku.trim().toLowerCase() === cleanBarcode.toLowerCase()
+        );
+        if (item) {
+          item.scannedQuantity += 1;
+          item.lastScannedAt = new Date().toISOString();
+          this.saveStoredShipments(list);
+          audioSynth.playSuccessBeep();
+          return { success: true, item, message: `Отсканировано: ${item.title} (${item.scannedQuantity}/${item.plannedQuantity} шт.)` };
+        }
+      }
       audioSynth.playErrorBeep();
-      const err = await res.json().catch(() => ({}));
-      return { success: false, message: err.message || 'Ошибка сканирования на сервере' };
+      return { success: false, message: `Штрихкод ${cleanBarcode} не найден`, isNewItem: true };
     }
-
-    const data = await res.json();
-    audioSynth.playSuccessBeep();
-    return { success: true, item: data.item, message: 'Товар принят' };
   }
 
   /**
@@ -265,6 +329,34 @@ export class ShipmentService {
     shipmentId: string,
     newItem: { barcode: string; title: string; plannedQuantity: number; sku?: string }
   ): Promise<ShipmentItem> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/items`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            barcode: newItem.barcode,
+            sku: newItem.sku || `SKU-${newItem.barcode}`,
+            title: newItem.title,
+            plannedQuantity: newItem.plannedQuantity || 10
+          })
+        });
+        if (res.ok) {
+          const item = await res.json();
+          audioSynth.playSuccessBeep();
+          return item;
+        }
+      } catch (e) {
+        console.warn('Add item server call failed, using local:', e);
+      }
+    }
+
     const list = this.loadStoredShipments();
     const shipment = list.find((s) => s.id === shipmentId);
     if (!shipment) throw new Error('Поставка не найдена');
@@ -274,7 +366,7 @@ export class ShipmentService {
       barcode: newItem.barcode,
       sku: newItem.sku || `SKU-${newItem.barcode}`,
       title: newItem.title,
-      plannedQuantity: newItem.plannedQuantity,
+      plannedQuantity: newItem.plannedQuantity || 10,
       scannedQuantity: 1,
       lastScannedAt: new Date().toISOString()
     };
@@ -295,19 +387,46 @@ export class ShipmentService {
     itemId: string,
     scannedQuantity: number
   ): Promise<ShipmentItem> {
+    const config = AuthService.getConfig();
+    const safeQty = Math.max(0, scannedQuantity);
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        await fetch(`${config.baseUrl}/shipments/${shipmentId}/items/${itemId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ scannedQuantity: safeQty })
+        });
+      } catch (e) {
+        console.warn('Update quantity server call failed:', e);
+      }
+    }
+
     const list = this.loadStoredShipments();
     const shipment = list.find((s) => s.id === shipmentId);
-    if (!shipment) throw new Error('Поставка не найдена');
+    if (shipment) {
+      const item = shipment.items.find((it) => it.id === itemId);
+      if (item) {
+        item.scannedQuantity = safeQty;
+        item.lastScannedAt = new Date().toISOString();
+        shipment.updatedAt = new Date().toISOString();
+        this.saveStoredShipments(list);
+        return item;
+      }
+    }
 
-    const item = shipment.items.find((it) => it.id === itemId);
-    if (!item) throw new Error('Товар не найден');
-
-    item.scannedQuantity = Math.max(0, scannedQuantity);
-    item.lastScannedAt = new Date().toISOString();
-    shipment.updatedAt = new Date().toISOString();
-
-    this.saveStoredShipments(list);
-    return item;
+    return {
+      id: itemId,
+      barcode: '',
+      sku: '',
+      title: '',
+      plannedQuantity: 0,
+      scannedQuantity: safeQty
+    };
   }
 
   /**
@@ -317,6 +436,28 @@ export class ShipmentService {
     shipmentId: string,
     targetWarehouse: WBWarehouse
   ): Promise<PackingBox> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/boxes`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ targetWarehouse })
+        });
+        if (res.ok) {
+          const updatedShp = await res.json();
+          return updatedShp.boxes[updatedShp.boxes.length - 1];
+        }
+      } catch (e) {
+        console.warn('Create box server call failed:', e);
+      }
+    }
+
     const list = this.loadStoredShipments();
     const shipment = list.find((s) => s.id === shipmentId);
     if (!shipment) throw new Error('Поставка не найдена');
@@ -343,6 +484,24 @@ export class ShipmentService {
     boxNumber: number,
     targetWarehouse: WBWarehouse
   ): Promise<PackingBox> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        await fetch(`${config.baseUrl}/shipments/${shipmentId}/boxes/${boxNumber}/warehouse`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ targetWarehouse })
+        });
+      } catch (e) {
+        console.warn('Update warehouse server call failed:', e);
+      }
+    }
+
     const list = this.loadStoredShipments();
     const shipment = list.find((s) => s.id === shipmentId);
     if (!shipment) throw new Error('Поставка не найдена');
@@ -365,6 +524,27 @@ export class ShipmentService {
     itemId: string,
     quantity: number
   ): Promise<Shipment> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/boxes/${boxNumber}/pack`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ itemId, quantity })
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (e) {
+        console.warn('Pack item server call failed:', e);
+      }
+    }
+
     const list = this.loadStoredShipments();
     const shipment = list.find((s) => s.id === shipmentId);
     if (!shipment) throw new Error('Поставка не найдена');
@@ -402,6 +582,32 @@ export class ShipmentService {
     itemId: string,
     moveQuantity: number
   ): Promise<Shipment> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/boxes/move`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            fromBoxNumber,
+            toBoxNumber,
+            itemId,
+            quantity: moveQuantity
+          })
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (e) {
+        console.warn('Move item server call failed:', e);
+      }
+    }
+
     const list = this.loadStoredShipments();
     const shipment = list.find((s) => s.id === shipmentId);
     if (!shipment) throw new Error('Поставка не найдена');
@@ -443,6 +649,23 @@ export class ShipmentService {
    * Удаление пустой коробки
    */
   public static async deleteBox(shipmentId: string, boxNumber: number): Promise<Shipment> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/boxes/${boxNumber}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (e) {
+        console.warn('Delete box server call failed:', e);
+      }
+    }
+
     const list = this.loadStoredShipments();
     const shipment = list.find((s) => s.id === shipmentId);
     if (!shipment) throw new Error('Поставка не найдена');
