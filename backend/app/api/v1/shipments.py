@@ -193,7 +193,7 @@ def process_barcode_scan(id: str, req: ScanRequest = Body(...), db: Session = De
         # Поиск информации о товаре в глобальной базе / прошлых поставках
         catalog_item = db.query(ShipmentItemModel).filter(
             (ShipmentItemModel.barcode == barcode) | (ShipmentItemModel.sku.ilike(barcode))
-        ).order_by(ShipmentItemModel.created_at.desc() if hasattr(ShipmentItemModel, 'created_at') else ShipmentItemModel.id.desc()).first()
+        ).order_by(ShipmentItemModel.id.desc()).first()
 
         catalog_product = None
         if catalog_item:

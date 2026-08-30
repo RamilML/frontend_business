@@ -403,7 +403,7 @@ export class ShipmentService {
       };
     } catch (e) {
       // Fallback to local
-      console.warn('Scan server call failed, falling back to mock logic:', e);
+      console.warn('Scan server call failed, falling back to local catalog lookup:', e);
       const list = this.loadStoredShipments();
       const shipment = list.find((s) => s.id === shipmentId);
       if (shipment) {
@@ -418,8 +418,40 @@ export class ShipmentService {
           return { success: true, item, message: `Отсканировано: ${item.title} (${item.scannedQuantity}/${item.plannedQuantity} шт.)` };
         }
       }
+
+      // Поиск информации о товаре в других локальных поставках
+      let catalogItem: ShipmentItem | undefined;
+      for (const s of list) {
+        const found = s.items.find(
+          (it) =>
+            it.barcode.trim().toLowerCase() === cleanBarcode.toLowerCase() ||
+            it.sku.trim().toLowerCase() === cleanBarcode.toLowerCase()
+        );
+        if (found) {
+          catalogItem = found;
+          break;
+        }
+      }
+
       audioSynth.playErrorBeep();
-      return { success: false, message: `Штрихкод ${cleanBarcode} не найден`, isNewItem: true };
+      return {
+        success: false,
+        message: catalogItem
+          ? `Товар распознан из каталога: ${catalogItem.title}`
+          : `Штрихкод ${cleanBarcode} не найден`,
+        isNewItem: true,
+        catalogProduct: catalogItem
+          ? {
+              barcode: catalogItem.barcode,
+              title: catalogItem.title,
+              sku: catalogItem.sku,
+              article: catalogItem.article,
+              size: catalogItem.size,
+              brand: catalogItem.brand,
+              category: catalogItem.category
+            }
+          : undefined
+      };
     }
   }
 
