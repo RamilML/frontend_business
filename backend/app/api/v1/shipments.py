@@ -1,0 +1,294 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from typing import List
+from datetime import datetime
+
+from app.core.database import get_db
+from app.models.shipment import ShipmentModel, ShipmentItemModel, PackingBoxModel
+from app.models.client import ClientModel
+from app.schemas.shipment import (
+    ShipmentCreate, ShipmentResponse, ShipmentItemResponse,
+    ScanRequest, ScanResponse, UpdateItemQtyRequest,
+    CreateBoxRequest, UpdateBoxWarehouseRequest, PackItemRequest, MoveItemRequest,
+    PackingBoxSchema, BoxItemSchema
+)
+
+router = APIRouter(prefix="/shipments", tags=["Shipments"])
+
+def format_shipment_response(s: ShipmentModel) -> ShipmentResponse:
+    items_resp = [
+        ShipmentItemResponse(
+            id=it.id,
+            barcode=it.barcode,
+            sku=it.sku,
+            title=it.title,
+            category=it.category,
+            article=it.article,
+            size=it.size,
+            brand=it.brand,
+            plannedQuantity=it.planned_quantity,
+            scannedQuantity=it.scanned_quantity,
+            lastScannedAt=it.last_scanned_at
+        ) for it in s.items
+    ]
+
+    boxes_resp = [
+        PackingBoxSchema(
+            boxNumber=b.box_number,
+            targetWarehouse=b.target_warehouse,
+            items=[
+                BoxItemSchema(
+                    itemId=bi.get("itemId", ""),
+                    barcode=bi.get("barcode", ""),
+                    title=bi.get("title", ""),
+                    quantity=bi.get("quantity", 0)
+                ) for bi in (b.items or [])
+            ]
+        ) for b in s.boxes
+    ]
+
+    return ShipmentResponse(
+        id=s.id,
+        shipmentNumber=s.shipment_number,
+        clientId=s.client_id,
+        clientName=s.client_name,
+        targetWarehouses=s.target_warehouses or [],
+        status=s.status,
+        operatorId=s.operator_id,
+        operatorName=s.operator_name,
+        items=items_resp,
+        boxes=boxes_resp,
+        createdAt=s.created_at,
+        updatedAt=s.updated_at
+    )
+
+@router.get("", response_model=List[ShipmentResponse])
+def get_shipments(db: Session = Depends(get_db)):
+    shipments = db.query(ShipmentModel).order_by(ShipmentModel.created_at.desc()).all()
+    return [format_shipment_response(s) for s in shipments]
+
+@router.get("/{id}", response_model=ShipmentResponse)
+def get_shipment_by_id(id: str, db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+    return format_shipment_response(shipment)
+
+@router.post("", response_model=ShipmentResponse, status_code=status.HTTP_201_CREATED)
+def create_shipment(dto: ShipmentCreate, db: Session = Depends(get_db)):
+    client = db.query(ClientModel).filter(ClientModel.id == dto.clientId).first()
+    client_name = client.name if client else dto.clientId
+
+    shipment = ShipmentModel(
+        shipment_number=dto.shipmentNumber,
+        client_id=dto.clientId,
+        client_name=client_name,
+        target_warehouses=dto.targetWarehouses,
+        status="receiving"
+    )
+    db.add(shipment)
+    db.flush()
+
+    if dto.initialItems:
+        for idx, it in enumerate(dto.initialItems):
+            item_model = ShipmentItemModel(
+                shipment_id=shipment.id,
+                barcode=it.barcode,
+                sku=it.sku or f"SKU-{it.barcode}",
+                title=it.title,
+                category=it.category,
+                article=it.article,
+                size=it.size,
+                brand=it.brand,
+                planned_quantity=it.plannedQuantity,
+                scanned_quantity=0
+            )
+            db.add(item_model)
+
+    db.commit()
+    db.refresh(shipment)
+    return format_shipment_response(shipment)
+
+@router.post("/{id}/scan", response_model=ScanResponse)
+def process_barcode_scan(id: str, req: ScanRequest, db: Session = Depends(get_db)):
+    barcode = req.barcode.strip()
+    if not barcode:
+        return ScanResponse(success=False, message="Пустой штрихкод")
+
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    item = db.query(ShipmentItemModel).filter(
+        ShipmentItemModel.shipment_id == id,
+        (ShipmentItemModel.barcode == barcode) | (ShipmentItemModel.sku.ilike(barcode))
+    ).first()
+
+    if item:
+        item.scanned_quantity += 1
+        item.last_scanned_at = datetime.utcnow()
+        shipment.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(item)
+
+        item_resp = ShipmentItemResponse(
+            id=item.id,
+            barcode=item.barcode,
+            sku=item.sku,
+            title=item.title,
+            category=item.category,
+            article=item.article,
+            size=item.size,
+            brand=item.brand,
+            plannedQuantity=item.planned_quantity,
+            scannedQuantity=item.scanned_quantity,
+            lastScannedAt=item.last_scanned_at
+        )
+
+        return ScanResponse(
+            success=True,
+            item=item_resp,
+            message=f"Отсканировано: {item.title} ({item.scanned_quantity}/{item.planned_quantity} шт.)"
+        )
+    else:
+        return ScanResponse(
+            success=False,
+            message=f"Штрихкод {barcode} не найден в плановом списке этой поставки.",
+            isNewItem=True
+        )
+
+@router.put("/{id}/items/{itemId}")
+def update_item_quantity(id: str, itemId: str, req: UpdateItemQtyRequest, db: Session = Depends(get_db)):
+    item = db.query(ShipmentItemModel).filter(
+        ShipmentItemModel.shipment_id == id,
+        ShipmentItemModel.id == itemId
+    ).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Товар не найден")
+
+    item.scanned_quantity = max(0, req.scannedQuantity)
+    item.last_scanned_at = datetime.utcnow()
+    db.commit()
+    return {"success": True, "scannedQuantity": item.scanned_quantity}
+
+@router.post("/{id}/boxes")
+def create_box(id: str, req: CreateBoxRequest, db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    next_num = (max([b.box_number for b in shipment.boxes]) if shipment.boxes else 0) + 1
+    new_box = PackingBoxModel(
+        shipment_id=id,
+        box_number=next_num,
+        target_warehouse=req.targetWarehouse,
+        items=[]
+    )
+    db.add(new_box)
+    db.commit()
+    db.refresh(shipment)
+    return format_shipment_response(shipment)
+
+@router.put("/{id}/boxes/{boxNumber}/warehouse")
+def update_box_warehouse(id: str, boxNumber: int, req: UpdateBoxWarehouseRequest, db: Session = Depends(get_db)):
+    box = db.query(PackingBoxModel).filter(
+        PackingBoxModel.shipment_id == id,
+        PackingBoxModel.box_number == boxNumber
+    ).first()
+    if not box:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
+
+    box.target_warehouse = req.targetWarehouse
+    db.commit()
+    return {"success": True, "boxNumber": boxNumber, "targetWarehouse": box.target_warehouse}
+
+@router.post("/{id}/boxes/{boxNumber}/pack")
+def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest, db: Session = Depends(get_db)):
+    box = db.query(PackingBoxModel).filter(
+        PackingBoxModel.shipment_id == id,
+        PackingBoxModel.box_number == boxNumber
+    ).first()
+    if not box:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
+
+    item = db.query(ShipmentItemModel).filter(
+        ShipmentItemModel.shipment_id == id,
+        ShipmentItemModel.id == req.itemId
+    ).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Товар не найден")
+
+    current_items = list(box.items or [])
+    found = False
+    for bi in current_items:
+        if bi.get("itemId") == req.itemId:
+            bi["quantity"] = bi.get("quantity", 0) + req.quantity
+            found = True
+            break
+    if not found:
+        current_items.append({
+            "itemId": item.id,
+            "barcode": item.barcode,
+            "title": item.title,
+            "quantity": req.quantity
+        })
+
+    box.items = current_items
+    db.commit()
+    
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    return format_shipment_response(shipment)
+
+@router.post("/{id}/boxes/move")
+def move_items_between_boxes(id: str, req: MoveItemRequest, db: Session = Depends(get_db)):
+    from_box = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id, PackingBoxModel.box_number == req.fromBoxNumber).first()
+    to_box = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id, PackingBoxModel.box_number == req.toBoxNumber).first()
+    if not from_box or not to_box:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
+
+    from_items = list(from_box.items or [])
+    to_items = list(to_box.items or [])
+
+    target_item = None
+    for bi in from_items:
+        if bi.get("itemId") == req.itemId:
+            target_item = bi
+            break
+
+    if not target_item or target_item.get("quantity", 0) < req.quantity:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Недостаточно товара в исходной коробке")
+
+    target_item["quantity"] -= req.quantity
+    if target_item["quantity"] <= 0:
+        from_items = [bi for bi in from_items if bi.get("itemId") != req.itemId]
+
+    found_to = False
+    for bi in to_items:
+        if bi.get("itemId") == req.itemId:
+            bi["quantity"] = bi.get("quantity", 0) + req.quantity
+            found_to = True
+            break
+    if not found_to:
+        to_items.append({
+            "itemId": target_item.get("itemId"),
+            "barcode": target_item.get("barcode"),
+            "title": target_item.get("title"),
+            "quantity": req.quantity
+        })
+
+    from_box.items = from_items
+    to_box.items = to_items
+    db.commit()
+
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    return format_shipment_response(shipment)
+
+@router.delete("/{id}/boxes/{boxNumber}")
+def delete_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
+    box = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id, PackingBoxModel.box_number == boxNumber).first()
+    if not box:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
+    db.delete(box)
+    db.commit()
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    return format_shipment_response(shipment)

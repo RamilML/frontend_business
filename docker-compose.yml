@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ff_assistant_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - DATABASE_URL=sqlite:///./ff_assistant.db
+      - SECRET_KEY=super-secret-jwt-key-ff-assistant-2026
+    volumes:
+      - ./backend/ff_assistant.db:/app/ff_assistant.db
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ff_assistant_frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
