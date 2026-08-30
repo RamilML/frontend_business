@@ -550,6 +550,40 @@ def delete_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     return format_shipment_response(shipment)
 
+def validate_shipment_ready_for_shipping(shipment: ShipmentModel):
+    total_scanned = sum(it.scanned_quantity for it in shipment.items)
+    if total_scanned == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя отгрузить поставку: ни один товар ещё не принят сканером."
+        )
+
+    total_packed = sum(sum(bi.get("quantity", 0) for bi in (b.items or [])) for b in shipment.boxes)
+    if total_packed < total_scanned:
+        remaining = total_scanned - total_packed
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Нельзя отгрузить: не все принятые товары уложены в коробки (осталось уложить: {remaining} шт.)."
+        )
+
+    if not shipment.boxes or len(shipment.boxes) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Нельзя отгрузить: в поставке нет созданных коробок."
+        )
+
+    for b in shipment.boxes:
+        if not b.items or len(b.items) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Коробка №{b.box_number} пуста. Заполните или удалите её перед отгрузкой."
+            )
+        if not b.is_packed:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Коробка №{b.box_number} не запечатана. Все коробки должны быть запечатаны и заклеены перед отгрузкой."
+            )
+
 @router.put("/{id}/boxes/{boxNumber}/seal")
 def seal_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
@@ -569,6 +603,12 @@ def seal_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
     # Toggle sealed status
     box.is_packed = not bool(box.is_packed)
     box.sealed_at = datetime.utcnow() if box.is_packed else None
+
+    # If unsealed, shipment cannot remain in 'ready_to_ship'
+    if not box.is_packed and shipment.status == "ready_to_ship":
+        shipment.status = "packing"
+
+    shipment.updated_at = datetime.utcnow()
     db.commit()
 
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
@@ -580,11 +620,8 @@ def finalize_packing(id: str, db: Session = Depends(get_db)):
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
 
-    # Mark all boxes as packed/sealed
-    for box in shipment.boxes:
-        box.is_packed = True
-        if not box.sealed_at:
-            box.sealed_at = datetime.utcnow()
+    # Validate that all items are packed, all boxes non-empty and sealed
+    validate_shipment_ready_for_shipping(shipment)
 
     # Move shipment status to ready_to_ship
     shipment.status = "ready_to_ship"
@@ -599,6 +636,9 @@ def ship_shipment(id: str, db: Session = Depends(get_db)):
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    # Validate before shipping to driver
+    validate_shipment_ready_for_shipping(shipment)
 
     shipment.status = "shipped"
     shipment.updated_at = datetime.utcnow()

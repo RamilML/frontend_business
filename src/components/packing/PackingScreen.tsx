@@ -112,7 +112,8 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
   const packingProgressPercent = totalScannedInShipment > 0 ? Math.min(100, Math.round((totalPackedInBoxes / totalScannedInShipment) * 100)) : 0;
   
   const sealedBoxesCount = shipment.boxes.filter((b) => b.isPacked).length;
-  const allBoxesSealed = shipment.boxes.length > 0 && sealedBoxesCount === shipment.boxes.length;
+  const hasEmptyBoxes = shipment.boxes.some((b) => b.items.length === 0);
+  const allBoxesSealed = shipment.boxes.length > 0 && sealedBoxesCount === shipment.boxes.length && !hasEmptyBoxes;
   const isFullyPacked = totalScannedInShipment > 0 && remainingUnpacked === 0 && allBoxesSealed;
   const isLocked = shipment.status === 'shipped' || shipment.status === 'completed';
 
@@ -140,70 +141,92 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
 
   const handleSelectItem = (itemId: string) => {
     setSelectedItemId(itemId);
-    if (!itemId || !shipment) {
-      setPackQuantity(1);
-      return;
-    }
     const item = shipment.items.find((it) => it.id === itemId);
     if (item) {
-      // Считаем сколько уже уложено этого товара во все коробки
       const alreadyPacked = shipment.boxes.reduce((acc, b) => {
         const found = b.items.find((bi) => bi.itemId === itemId);
         return acc + (found ? found.quantity : 0);
       }, 0);
-
-      // По умолчанию подставляем оставшееся неупакованное количество (или все принятое)
-      const remaining = Math.max(1, item.scannedQuantity - alreadyPacked);
-      setPackQuantity(remaining);
-    } else {
-      setPackQuantity(1);
+      const remaining = Math.max(0, item.scannedQuantity - alreadyPacked);
+      setPackQuantity(remaining > 0 ? remaining : 1);
     }
   };
 
   const handlePackItemSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedItemId || !activeBox) return;
+    if (!selectedItemId) return;
+    const qty = parseInt(String(packQuantity), 10);
+    if (isNaN(qty) || qty <= 0) return;
 
-    const qtyToPack = Math.max(1, Number(packQuantity) || 1);
-    await ShipmentService.packItemToBox(shipmentId, activeBox.boxNumber, selectedItemId, qtyToPack);
-    setSelectedItemId('');
-    setPackQuantity(1);
-    loadShipment();
+    try {
+      const updated = await ShipmentService.packItemToBox(shipmentId, activeBoxNumber, selectedItemId, qty);
+      setShipment(updated);
+      setSelectedItemId('');
+      setPackQuantity(1);
+      setSuccessMessage(`Успешно уложено ${qty} шт. в Коробку №${activeBoxNumber}!`);
+      setTimeout(() => setSuccessMessage(null), 3500);
+    } catch (err: any) {
+      alert(err?.message || 'Ошибка укладки в коробку');
+    }
   };
 
   const handleSealToggle = async (boxNumber: number) => {
     try {
       const updated = await ShipmentService.sealBox(shipmentId, boxNumber);
       setShipment(updated);
-      const box = updated.boxes.find((b) => b.boxNumber === boxNumber);
-      if (box?.isPacked) {
-        setSuccessMessage(`Коробка №${boxNumber} успешно запечатана и готова к маркировке!`);
+      const isNowSealed = updated.boxes.find((b) => b.boxNumber === boxNumber)?.isPacked;
+      if (isNowSealed) {
+        setSuccessMessage(`Коробка №${boxNumber} успешно запечатана и зафиксирована!`);
       } else {
-        setSuccessMessage(`Коробка №${boxNumber} вскрыта для корректировки содержимого.`);
+        setSuccessMessage(`Коробка №${boxNumber} вскрыта для правок. Статус поставки возвращен в процесс упаковки.`);
       }
       setTimeout(() => setSuccessMessage(null), 4000);
-    } catch (err) {
-      console.error('Seal box error:', err);
+    } catch (err: any) {
+      alert(err?.message || 'Ошибка запечатывания коробки');
     }
   };
 
   const handleFinalizeShipment = async () => {
+    if (!isFullyPacked) {
+      if (remainingUnpacked > 0) {
+        alert(`Нельзя завершить упаковку: осталось уложить ${remainingUnpacked} шт. товаров.`);
+        return;
+      }
+      if (!allBoxesSealed) {
+        alert(`Нельзя завершить упаковку: запечатайте все ${shipment.boxes.length} коробок.`);
+        return;
+      }
+      return;
+    }
+
     try {
       const updated = await ShipmentService.finalizePacking(shipmentId);
       setShipment(updated);
       setSuccessMessage('🎉 Поставка успешно запечатана и переведена в статус «Готова к отгрузке»!');
-    } catch (e) {
-      console.warn('Finalize error:', e);
+    } catch (e: any) {
+      alert(e?.message || 'Ошибка завершения упаковки');
     }
   };
 
   const handleShipToDriver = async () => {
+    if (!isFullyPacked) {
+      if (remainingUnpacked > 0) {
+        alert(`Нельзя отгрузить: не все принятые товары уложены в коробки (осталось уложить ${remainingUnpacked} шт.).`);
+        return;
+      }
+      if (!allBoxesSealed) {
+        alert(`Нельзя отгрузить: запечатайте все коробки перед передачей водителю (запечатано ${sealedBoxesCount} из ${shipment.boxes.length}).`);
+        return;
+      }
+      return;
+    }
+
     try {
       const updated = await ShipmentService.shipShipment(shipmentId);
       setShipment(updated);
       setSuccessMessage('🚚 Поставка успешно передана водителю и переведена в статус «Отгружена»!');
-    } catch (e) {
-      console.warn('Ship error:', e);
+    } catch (e: any) {
+      alert(e?.message || 'Ошибка отгрузки водителю');
     }
   };
 
@@ -236,7 +259,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                 <span className="badge badge-client" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                   <Truck size={14} /> Отгружена водителю
                 </span>
-              ) : shipment.status === 'ready_to_ship' ? (
+              ) : shipment.status === 'ready_to_ship' && isFullyPacked ? (
                 <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
                   <ShieldCheck size={14} /> Готова к отгрузке
                 </span>
@@ -257,7 +280,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
             <Printer size={16} /> Упаковочный лист (Печать)
           </button>
 
-          {!isLocked && allBoxesSealed && shipment.status !== 'ready_to_ship' && (
+          {!isLocked && isFullyPacked && shipment.status !== 'ready_to_ship' && (
             <button
               type="button"
               className="btn-primary"
@@ -268,7 +291,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
             </button>
           )}
 
-          {!isLocked && shipment.status === 'ready_to_ship' && (
+          {!isLocked && isFullyPacked && shipment.status === 'ready_to_ship' && (
             <button
               type="button"
               className="btn-primary"
@@ -292,6 +315,45 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
           )}
         </div>
       </div>
+
+      {/* Quality Control Checklist Warning */}
+      {!isLocked && !isFullyPacked && (
+        <div
+          style={{
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.35)',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.85rem 1.1rem',
+            marginBottom: '1.25rem'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: '#f59e0b', marginBottom: '0.4rem', fontSize: '0.92rem' }}>
+            <AlertCircle size={18} color="#f59e0b" />
+            <span>Контроль готовности к отгрузке:</span>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem' }}>
+            {totalScannedInShipment === 0 ? (
+              <span style={{ color: '#f43f5e' }}>❌ Ни один товар не принят по сканеру (примите товары в сканере)</span>
+            ) : remainingUnpacked > 0 ? (
+              <span style={{ color: '#f43f5e' }}>❌ Не все принятые товары уложены в коробки: <b>осталось уложить {remainingUnpacked} шт.</b></span>
+            ) : (
+              <span style={{ color: '#10b981' }}>✅ Все принятые товары ({totalScannedInShipment} шт.) уложены по коробкам</span>
+            )}
+
+            {hasEmptyBoxes ? (
+              <span style={{ color: '#f43f5e' }}>❌ Есть пустые коробки: заполните их товаром или удалите</span>
+            ) : shipment.boxes.length === 0 ? (
+              <span style={{ color: '#f43f5e' }}>❌ Добавьте хотя бы 1 коробку</span>
+            ) : null}
+
+            {!allBoxesSealed && shipment.boxes.length > 0 ? (
+              <span style={{ color: '#f43f5e' }}>❌ Не все коробки запечатаны: <b>запечатано {sealedBoxesCount} из {shipment.boxes.length} шт.</b> (Заклейте все коробки перед отгрузкой)</span>
+            ) : shipment.boxes.length > 0 && !hasEmptyBoxes ? (
+              <span style={{ color: '#10b981' }}>✅ Все {shipment.boxes.length} коробок запечатаны и готовы</span>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* ReadOnly Warning Alert */}
       {isLocked && (

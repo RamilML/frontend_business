@@ -83,11 +83,24 @@ export const OperatorDashboard: React.FC = () => {
   };
 
   const handleShipToDriver = async (shipmentId: string) => {
+    const shp = shipments.find((s) => s.id === shipmentId);
+    if (shp) {
+      const shpScanned = shp.items.reduce((acc, it) => acc + it.scannedQuantity, 0);
+      const shpPacked = shp.boxes.reduce((acc, b) => acc + b.items.reduce((s, bi) => s + bi.quantity, 0), 0);
+      const shpAllSealed = shp.boxes.length > 0 && shp.boxes.every(b => b.isPacked && b.items.length > 0);
+      if (shpScanned === 0 || shpScanned !== shpPacked || !shpAllSealed) {
+        alert('Нельзя отгрузить: убедитесь, что все принятые товары уложены в коробки и все коробки запечатаны.');
+        setActiveShipmentId(shipmentId);
+        return;
+      }
+    }
+
     setShippingShipmentId(shipmentId);
     try {
       await ShipmentService.shipShipment(shipmentId);
       await loadShipments();
-    } catch (err) {
+    } catch (err: any) {
+      alert(err?.message || 'Ошибка отгрузки водителю');
       console.error('Ship shipment error:', err);
     } finally {
       setShippingShipmentId(null);
@@ -250,57 +263,93 @@ export const OperatorDashboard: React.FC = () => {
                   </div>
 
                     {/* Action buttons depending on shipment status */}
-                    {shp.status === 'ready_to_ship' ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {(() => {
+                      const shpScanned = shp.items.reduce((acc, it) => acc + it.scannedQuantity, 0);
+                      const shpPacked = shp.boxes.reduce((acc, b) => acc + b.items.reduce((s, bi) => s + bi.quantity, 0), 0);
+                      const shpAllSealed = shp.boxes.length > 0 && shp.boxes.every(b => b.isPacked && b.items.length > 0);
+                      const shpCanShip = shpScanned > 0 && shpScanned === shpPacked && shpAllSealed;
+
+                      if (shp.status === 'ready_to_ship') {
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            {shpCanShip ? (
+                              <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={() => handleShipToDriver(shp.id)}
+                                disabled={shippingShipmentId === shp.id}
+                                style={{
+                                  background: '#10b981',
+                                  borderColor: '#10b981',
+                                  color: '#fff',
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.5rem',
+                                  padding: '0.65rem'
+                                }}
+                              >
+                                <Truck size={16} />
+                                {shippingShipmentId === shp.id ? 'Отгрузка...' : '🚚 Отгрузить водителю'}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={() => setActiveShipmentId(shp.id)}
+                                style={{
+                                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                  borderColor: '#f59e0b',
+                                  color: '#fff',
+                                  width: '100%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '0.5rem',
+                                  padding: '0.65rem'
+                                }}
+                              >
+                                <Box size={16} /> 📦 Завершить упаковку и запечатать
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => setActiveShipmentId(shp.id)}
+                              style={{ width: '100%', fontSize: '0.8rem', padding: '0.4rem' }}
+                            >
+                              <Box size={14} /> Открыть коробки / Сканер
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      if (shp.status === 'shipped' || shp.status === 'completed') {
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => setActiveShipmentId(shp.id)}
+                              style={{ width: '100%', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                            >
+                              <Lock size={15} /> {shp.status === 'completed' ? '🏁 Завершена (Просмотр)' : '🚚 Отгружена (Просмотр)'}
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      return (
                         <button
-                          type="button"
                           className="btn-primary"
-                          onClick={() => handleShipToDriver(shp.id)}
-                          disabled={shippingShipmentId === shp.id}
-                          style={{
-                            background: '#10b981',
-                            borderColor: '#10b981',
-                            color: '#fff',
-                            width: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '0.5rem',
-                            padding: '0.65rem'
-                          }}
-                        >
-                          <Truck size={16} />
-                          {shippingShipmentId === shp.id ? 'Отгрузка...' : '🚚 Отгрузить водителю'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary"
                           onClick={() => setActiveShipmentId(shp.id)}
-                          style={{ width: '100%', fontSize: '0.8rem', padding: '0.4rem' }}
+                          style={{ width: '100%' }}
                         >
-                          <Box size={14} /> Открыть коробки / Сканер
+                          <Play size={16} /> {shp.status === 'packing' ? '📦 Перейти к упаковке' : 'Начать / Продолжить сканирование'}
                         </button>
-                      </div>
-                    ) : shp.status === 'shipped' || shp.status === 'completed' ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          onClick={() => setActiveShipmentId(shp.id)}
-                          style={{ width: '100%', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
-                        >
-                          <Lock size={15} /> {shp.status === 'completed' ? '🏁 Завершена (Просмотр)' : '🚚 Отгружена (Просмотр)'}
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        className="btn-primary"
-                        onClick={() => setActiveShipmentId(shp.id)}
-                        style={{ width: '100%' }}
-                      >
-                        <Play size={16} /> {shp.status === 'packing' ? '📦 Перейти к упаковке' : 'Начать / Продолжить сканирование'}
-                      </button>
-                    )}
+                      );
+                    })()}
                   </div>
                 );
               })}
