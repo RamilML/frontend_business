@@ -157,8 +157,8 @@ def process_barcode_scan(id: str, req: ScanRequest = Body(...), db: Session = De
             isNewItem=True
         )
 
-@router.put("/{id}/items/{itemId}")
-def update_item_quantity(id: str, itemId: str, req: UpdateItemQtyRequest = Body(...), db: Session = Depends(get_db)):
+@router.put("/{id}/items/{itemId}", response_model=ShipmentItemResponse)
+def update_item_details(id: str, itemId: str, req: UpdateItemDetailsRequest = Body(...), db: Session = Depends(get_db)):
     item = db.query(ShipmentItemModel).filter(
         ShipmentItemModel.shipment_id == id,
         ShipmentItemModel.id == itemId
@@ -166,10 +166,63 @@ def update_item_quantity(id: str, itemId: str, req: UpdateItemQtyRequest = Body(
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Товар не найден")
 
-    item.scanned_quantity = max(0, req.scannedQuantity)
-    item.last_scanned_at = datetime.utcnow()
+    if req.title is not None and req.title.strip():
+        item.title = req.title.strip()
+    if req.sku is not None and req.sku.strip():
+        item.sku = req.sku.strip()
+    if req.article is not None:
+        item.article = req.article.strip() if req.article.strip() else None
+    if req.size is not None:
+        item.size = req.size.strip() if req.size.strip() else None
+    if req.plannedQuantity is not None:
+        item.planned_quantity = max(1, req.plannedQuantity)
+    if req.scannedQuantity is not None:
+        item.scanned_quantity = max(0, req.scannedQuantity)
+        item.last_scanned_at = datetime.utcnow()
+
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if shipment:
+        shipment.updated_at = datetime.utcnow()
+
     db.commit()
-    return {"success": True, "scannedQuantity": item.scanned_quantity}
+    db.refresh(item)
+
+    return ShipmentItemResponse(
+        id=item.id,
+        barcode=item.barcode,
+        sku=item.sku,
+        title=item.title,
+        category=item.category,
+        article=item.article,
+        size=item.size,
+        brand=item.brand,
+        plannedQuantity=item.planned_quantity,
+        scannedQuantity=item.scanned_quantity,
+        lastScannedAt=item.last_scanned_at
+    )
+
+@router.delete("/{id}/items/{itemId}")
+def delete_item_from_shipment(id: str, itemId: str, db: Session = Depends(get_db)):
+    item = db.query(ShipmentItemModel).filter(
+        ShipmentItemModel.shipment_id == id,
+        ShipmentItemModel.id == itemId
+    ).first()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Товар не найден")
+
+    # Удаляем ссылки на этот товар из коробок
+    boxes = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id).all()
+    for box in boxes:
+        if box.items:
+            box.items = [bi for bi in box.items if bi.get("itemId") != itemId]
+
+    db.delete(item)
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if shipment:
+        shipment.updated_at = datetime.utcnow()
+
+    db.commit()
+    return {"success": True, "message": "Товар удален из поставки"}
 
 @router.post("/{id}/items", response_model=ShipmentItemResponse, status_code=status.HTTP_201_CREATED)
 def add_item_to_shipment(id: str, it: ShipmentItemBase = Body(...), db: Session = Depends(get_db)):

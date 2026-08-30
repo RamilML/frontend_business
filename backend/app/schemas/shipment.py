@@ -72,7 +72,15 @@ class ScanResponse(BaseModel):
     isNewItem: Optional[bool] = False
 
 class UpdateItemQtyRequest(BaseModel):
-    scannedQuantity: int
+    scannedQuantity: Optional[int] = None
+
+class UpdateItemDetailsRequest(BaseModel):
+    title: Optional[str] = None
+    sku: Optional[str] = None
+    article: Optional[str] = None
+    size: Optional[str] = None
+    plannedQuantity: Optional[int] = None
+    scannedQuantity: Optional[int] = None
 
 class CreateBoxRequest(BaseModel):
     targetWarehouse: str

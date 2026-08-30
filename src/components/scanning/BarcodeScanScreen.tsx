@@ -15,7 +15,10 @@ import {
   Layers,
   Camera,
   PlusCircle,
-  PackagePlus
+  PackagePlus,
+  Edit2,
+  Trash2,
+  X
 } from 'lucide-react';
 
 interface Props {
@@ -37,6 +40,17 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const [newItemTitle, setNewItemTitle] = useState('');
   const [newItemSku, setNewItemSku] = useState('');
   const [newItemPlannedQty, setNewItemPlannedQty] = useState<number>(1);
+
+  // Edit Item Modal state
+  const [editingItem, setEditingItem] = useState<ShipmentItem | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editSku, setEditSku] = useState('');
+  const [editArticle, setEditArticle] = useState('');
+  const [editSize, setEditSize] = useState('');
+  const [editPlannedQty, setEditPlannedQty] = useState<number>(1);
+
+  // Delete Item Confirmation Modal state
+  const [deletingItem, setDeletingItem] = useState<ShipmentItem | null>(null);
 
   // TSD Keyboard Buffer Listener
   const keyBufferRef = useRef<string>('');
@@ -175,11 +189,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
         });
         triggerFlash('success');
 
-        // Background sync to ensure fresh state from server
-        const fresh = await ShipmentService.getShipmentById(shipmentId);
-        if (fresh) {
-          setShipment(fresh);
-        }
+        loadShipment(false);
       } catch (err) {
         console.error('Failed to add item:', err);
       }
@@ -190,7 +200,6 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const handleUpdateQuantity = async (itemId: string, currentQty: number, delta: number) => {
     const newQty = Math.max(0, currentQty + delta);
     
-    // 1. Instantly update React state so the UI reflects the click with 0 ms lag
     setShipment((prev) => {
       if (!prev) return prev;
       return {
@@ -201,11 +210,81 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
       };
     });
 
-    // 2. Persist to storage / server
     try {
       await ShipmentService.updateItemQuantity(shipmentId, itemId, newQty);
     } catch (e) {
       console.warn('Update quantity error:', e);
+    }
+  };
+
+  // Open Edit Modal
+  const handleOpenEditModal = (item: ShipmentItem) => {
+    setEditingItem(item);
+    setEditTitle(item.title);
+    setEditSku(item.sku);
+    setEditArticle(item.article || '');
+    setEditSize(item.size || '');
+    setEditPlannedQty(item.plannedQuantity);
+  };
+
+  // Save Item Edits
+  const handleSaveItemEdits = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    const itemId = editingItem.id;
+    const updates = {
+      title: editTitle.trim(),
+      sku: editSku.trim() || editingItem.sku,
+      article: editArticle.trim() || undefined,
+      size: editSize.trim() || undefined,
+      plannedQuantity: Math.max(1, Number(editPlannedQty) || 1)
+    };
+
+    // Optimistic update in UI
+    setShipment((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: prev.items.map((it) => (it.id === itemId ? { ...it, ...updates } : it))
+      };
+    });
+
+    setEditingItem(null);
+
+    try {
+      await ShipmentService.editShipmentItem(shipmentId, itemId, updates);
+      loadShipment(false);
+    } catch (err) {
+      console.error('Failed to edit item:', err);
+    }
+  };
+
+  // Delete Item
+  const handleConfirmDelete = async () => {
+    if (!deletingItem) return;
+    const itemId = deletingItem.id;
+
+    // Optimistic delete in UI
+    setShipment((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: prev.items.filter((it) => it.id !== itemId),
+        boxes: prev.boxes.map((b) => ({
+          ...b,
+          items: b.items.filter((bi) => bi.itemId !== itemId)
+        }))
+      };
+    });
+
+    setDeletingItem(null);
+
+    try {
+      await ShipmentService.deleteShipmentItem(shipmentId, itemId);
+      loadShipment(false);
+    } catch (err) {
+      console.error('Failed to delete item:', err);
     }
   };
 
@@ -382,7 +461,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                   <th style={{ padding: '0.85rem 1rem' }}>Штрихкод / SKU</th>
                   <th style={{ padding: '0.85rem 1rem' }}>План</th>
                   <th style={{ padding: '0.85rem 1rem' }}>Отсканировано (Факт)</th>
-                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'right' }}>Корректировка</th>
+                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'right' }}>Корректировка & Действия</th>
                 </tr>
               </thead>
               <tbody>
@@ -398,9 +477,9 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                     >
                       <td style={{ padding: '0.85rem 1.25rem' }}>
                         <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{item.title}</div>
-                        {item.article && (
+                        {(item.article || item.size) && (
                           <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            Арт: {item.article} {item.size && `• Размер: ${item.size}`}
+                            {item.article && `Арт: ${item.article}`} {item.size && `• Размер: ${item.size}`}
                           </div>
                         )}
                       </td>
@@ -429,7 +508,8 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                       </td>
 
                       <td style={{ padding: '0.85rem 1.25rem', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          {/* Minus Button */}
                           <button
                             type="button"
                             className="btn-secondary"
@@ -438,11 +518,13 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                               e.stopPropagation();
                               handleUpdateQuantity(item.id, item.scannedQuantity, -1);
                             }}
-                            style={{ padding: '0.35rem 0.6rem', cursor: 'pointer' }}
+                            style={{ padding: '0.35rem 0.55rem', cursor: 'pointer' }}
                             title="Уменьшить количество (-1)"
                           >
                             <Minus size={14} />
                           </button>
+
+                          {/* Plus Button */}
                           <button
                             type="button"
                             className="btn-secondary"
@@ -451,10 +533,40 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                               e.stopPropagation();
                               handleUpdateQuantity(item.id, item.scannedQuantity, 1);
                             }}
-                            style={{ padding: '0.35rem 0.6rem', borderColor: 'var(--primary)', cursor: 'pointer' }}
+                            style={{ padding: '0.35rem 0.55rem', borderColor: 'var(--primary)', cursor: 'pointer' }}
                             title="Добавить количество (+1)"
                           >
                             <Plus size={14} />
+                          </button>
+
+                          {/* Edit Details Button */}
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleOpenEditModal(item);
+                            }}
+                            style={{ padding: '0.35rem 0.55rem', color: '#38bdf8', borderColor: '#38bdf8' }}
+                            title="Редактировать название, артикул или план"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+
+                          {/* Delete Item Button */}
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setDeletingItem(item);
+                            }}
+                            style={{ padding: '0.35rem 0.55rem', color: '#f43f5e', borderColor: '#f43f5e' }}
+                            title="Удалить товар из поставки"
+                          >
+                            <Trash2 size={13} />
                           </button>
                         </div>
                       </td>
@@ -468,7 +580,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
 
       </div>
 
-      {/* Unlisted Barcode Modal: When an unexpected item is scanned */}
+      {/* Unlisted Barcode Modal */}
       {unknownBarcode && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: 480 }}>
@@ -533,6 +645,137 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Item Modal */}
+      {editingItem && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: 500 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#38bdf8' }}>
+                <Edit2 size={20} /> Редактирование товара
+              </h3>
+              <button type="button" className="btn-secondary" onClick={() => setEditingItem(null)} style={{ padding: '0.35rem' }}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Штрихкод: <b style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary)' }}>{editingItem.barcode}</b>
+            </div>
+
+            <form onSubmit={handleSaveItemEdits}>
+              <div className="form-group">
+                <label className="form-label">Наименование товара *</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label className="form-label">SKU</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editSku}
+                    onChange={(e) => setEditSku(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Артикул WB</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editArticle}
+                    onChange={(e) => setEditArticle(e.target.value)}
+                    placeholder="Например: WB-FUT-01"
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Размер</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={editSize}
+                    onChange={(e) => setEditSize(e.target.value)}
+                    placeholder="Например: M / 44 / 164"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">План (шт.) *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    value={editPlannedQty}
+                    onChange={(e) => setEditPlannedQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setEditingItem(null)}
+                >
+                  Отмена
+                </button>
+                <button type="submit" className="btn-primary" style={{ width: 'auto' }}>
+                  Сохранить изменения
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Item Confirmation Modal */}
+      {deletingItem && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: 440 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem', color: '#f43f5e' }}>
+              <Trash2 size={24} />
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Удалить товар из поставки?</h3>
+            </div>
+            
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+              Вы действительно хотите удалить <b>«{deletingItem.title}»</b> (ШК: {deletingItem.barcode})?
+            </p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+              Товар будет убран из общего плана приёмки и удален из упакованных коробок.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setDeletingItem(null)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleConfirmDelete}
+                style={{ background: '#f43f5e', borderColor: '#f43f5e', width: 'auto' }}
+              >
+                Да, удалить товар
+              </button>
+            </div>
           </div>
         </div>
       )}

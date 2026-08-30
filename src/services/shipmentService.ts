@@ -393,22 +393,53 @@ export class ShipmentService {
     itemId: string,
     scannedQuantity: number
   ): Promise<ShipmentItem> {
+    return this.editShipmentItem(shipmentId, itemId, { scannedQuantity });
+  }
+
+  /**
+   * Редактирование параметров товара (наименование, артикул, размер, план)
+   */
+  public static async editShipmentItem(
+    shipmentId: string,
+    itemId: string,
+    updates: Partial<ShipmentItem>
+  ): Promise<ShipmentItem> {
     const config = AuthService.getConfig();
-    const safeQty = Math.max(0, scannedQuantity);
 
     if (!config.useMock) {
       try {
         const token = AuthService.getStoredToken();
-        await fetch(`${config.baseUrl}/shipments/${shipmentId}/items/${itemId}`, {
+        const res = await fetch(`${config.baseUrl}/shipments/${shipmentId}/items/${itemId}`, {
           method: 'PUT',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ scannedQuantity: safeQty })
+          body: JSON.stringify({
+            title: updates.title,
+            sku: updates.sku,
+            article: updates.article,
+            size: updates.size,
+            plannedQuantity: updates.plannedQuantity,
+            scannedQuantity: updates.scannedQuantity
+          })
         });
+        if (res.ok) {
+          const updated = await res.json();
+          // Update local cache
+          const list = this.loadStoredShipments();
+          const shipment = list.find((s) => s.id === shipmentId);
+          if (shipment) {
+            const idx = shipment.items.findIndex((it) => it.id === itemId);
+            if (idx !== -1) {
+              shipment.items[idx] = { ...shipment.items[idx], ...updated };
+              this.saveStoredShipments(list);
+            }
+          }
+          return updated;
+        }
       } catch (e) {
-        console.warn('Update quantity server call failed:', e);
+        console.warn('Edit item server call failed, using local:', e);
       }
     }
 
@@ -417,8 +448,15 @@ export class ShipmentService {
     if (shipment) {
       const item = shipment.items.find((it) => it.id === itemId);
       if (item) {
-        item.scannedQuantity = safeQty;
-        item.lastScannedAt = new Date().toISOString();
+        if (updates.title !== undefined) item.title = updates.title;
+        if (updates.sku !== undefined) item.sku = updates.sku;
+        if (updates.article !== undefined) item.article = updates.article;
+        if (updates.size !== undefined) item.size = updates.size;
+        if (updates.plannedQuantity !== undefined) item.plannedQuantity = Math.max(1, updates.plannedQuantity);
+        if (updates.scannedQuantity !== undefined) {
+          item.scannedQuantity = Math.max(0, updates.scannedQuantity);
+          item.lastScannedAt = new Date().toISOString();
+        }
         shipment.updatedAt = new Date().toISOString();
         this.saveStoredShipments(list);
         return item;
@@ -428,11 +466,48 @@ export class ShipmentService {
     return {
       id: itemId,
       barcode: '',
-      sku: '',
-      title: '',
-      plannedQuantity: 0,
-      scannedQuantity: safeQty
+      sku: updates.sku || '',
+      title: updates.title || '',
+      plannedQuantity: updates.plannedQuantity || 1,
+      scannedQuantity: updates.scannedQuantity || 0
     };
+  }
+
+  /**
+   * Удаление товара из поставки
+   */
+  public static async deleteShipmentItem(
+    shipmentId: string,
+    itemId: string
+  ): Promise<boolean> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        await fetch(`${config.baseUrl}/shipments/${shipmentId}/items/${itemId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch (e) {
+        console.warn('Delete item server call failed:', e);
+      }
+    }
+
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === shipmentId);
+    if (shipment) {
+      shipment.items = shipment.items.filter((it) => it.id !== itemId);
+      // Remove item from boxes
+      shipment.boxes.forEach((box) => {
+        box.items = box.items.filter((bi) => bi.itemId !== itemId);
+      });
+      shipment.updatedAt = new Date().toISOString();
+      this.saveStoredShipments(list);
+      return true;
+    }
+
+    return true;
   }
 
   /**
