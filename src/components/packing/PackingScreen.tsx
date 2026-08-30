@@ -54,7 +54,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
 
   // Packing form state
   const [selectedItemId, setSelectedItemId] = useState<string>('');
-  const [packQuantity, setPackQuantity] = useState<number>(1);
+  const [packQuantity, setPackQuantity] = useState<number | string>(1);
 
   const loadShipment = async () => {
     setIsLoading(true);
@@ -141,7 +141,8 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
     e.preventDefault();
     if (!selectedItemId || !activeBox) return;
 
-    await ShipmentService.packItemToBox(shipmentId, activeBox.boxNumber, selectedItemId, packQuantity);
+    const qtyToPack = Math.max(1, Number(packQuantity) || 1);
+    await ShipmentService.packItemToBox(shipmentId, activeBox.boxNumber, selectedItemId, qtyToPack);
     setSelectedItemId('');
     setPackQuantity(1);
     loadShipment();
@@ -502,7 +503,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                     <button
                       type="button"
                       className="number-stepper-btn"
-                      onClick={() => setPackQuantity((q) => Math.max(1, q - 1))}
+                      onClick={() => setPackQuantity((q) => Math.max(1, (Number(q) || 0) - 1))}
                     >
                       <Minus size={14} />
                     </button>
@@ -512,13 +513,27 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                       className="form-input form-input-number"
                       style={{ textAlign: 'center', padding: '0.4rem 0.5rem', background: 'transparent', border: 'none' }}
                       value={packQuantity}
-                      onChange={(e) => setPackQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '') {
+                          setPackQuantity('');
+                        } else {
+                          const parsed = parseInt(val, 10);
+                          setPackQuantity(isNaN(parsed) ? '' : Math.max(0, parsed));
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!packQuantity || Number(packQuantity) < 1) {
+                          setPackQuantity(1);
+                        }
+                      }}
                       required
                     />
                     <button
                       type="button"
                       className="number-stepper-btn"
-                      onClick={() => setPackQuantity((q) => q + 1)}
+                      onClick={() => setPackQuantity((q) => (Number(q) || 0) + 1)}
                     >
                       <Plus size={14} />
                     </button>
@@ -526,7 +541,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                 </div>
 
                 <button type="submit" className="btn-primary" disabled={!selectedItemId}>
-                  <PackageCheck size={16} /> Положить {packQuantity} шт. в коробку
+                  <PackageCheck size={16} /> Положить {packQuantity || 1} шт. в коробку
                 </button>
               </form>
             ) : null}

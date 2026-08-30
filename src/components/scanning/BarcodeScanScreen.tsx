@@ -45,7 +45,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const [newItemSku, setNewItemSku] = useState('');
   const [newItemArticle, setNewItemArticle] = useState('');
   const [newItemSize, setNewItemSize] = useState('');
-  const [newItemPlannedQty, setNewItemPlannedQty] = useState<number>(1);
+  const [newItemPlannedQty, setNewItemPlannedQty] = useState<number | string>(1);
   const [isFromCatalog, setIsFromCatalog] = useState<boolean>(false);
 
   // Edit Item Modal state
@@ -54,7 +54,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const [editSku, setEditSku] = useState('');
   const [editArticle, setEditArticle] = useState('');
   const [editSize, setEditSize] = useState('');
-  const [editPlannedQty, setEditPlannedQty] = useState<number>(1);
+  const [editPlannedQty, setEditPlannedQty] = useState<number | string>(1);
 
   // Delete Item Confirmation Modal state
   const [deletingItem, setDeletingItem] = useState<ShipmentItem | null>(null);
@@ -735,7 +735,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                     <button
                       type="button"
                       className="number-stepper-btn"
-                      onClick={() => setNewItemPlannedQty((q) => Math.max(1, q - 1))}
+                      onClick={() => setNewItemPlannedQty((q) => Math.max(1, (Number(q) || 0) - 1))}
                     >
                       <Minus size={14} />
                     </button>
@@ -745,13 +745,27 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                       className="form-input form-input-number"
                       style={{ textAlign: 'center', padding: '0.4rem 0.5rem', background: 'transparent', border: 'none' }}
                       value={newItemPlannedQty}
-                      onChange={(e) => setNewItemPlannedQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '') {
+                          setNewItemPlannedQty('');
+                        } else {
+                          const parsed = parseInt(val, 10);
+                          setNewItemPlannedQty(isNaN(parsed) ? '' : Math.max(0, parsed));
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!newItemPlannedQty || Number(newItemPlannedQty) < 1) {
+                          setNewItemPlannedQty(1);
+                        }
+                      }}
                       required
                     />
                     <button
                       type="button"
                       className="number-stepper-btn"
-                      onClick={() => setNewItemPlannedQty((q) => q + 1)}
+                      onClick={() => setNewItemPlannedQty((q) => (Number(q) || 0) + 1)}
                     >
                       <Plus size={14} />
                     </button>
@@ -846,7 +860,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                     <button
                       type="button"
                       className="number-stepper-btn"
-                      onClick={() => setEditPlannedQty((q) => Math.max(1, q - 1))}
+                      onClick={() => setEditPlannedQty((q) => Math.max(1, (Number(q) || 0) - 1))}
                     >
                       <Minus size={14} />
                     </button>
@@ -856,13 +870,27 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                       className="form-input form-input-number"
                       style={{ textAlign: 'center', padding: '0.4rem 0.5rem', background: 'transparent', border: 'none' }}
                       value={editPlannedQty}
-                      onChange={(e) => setEditPlannedQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '') {
+                          setEditPlannedQty('');
+                        } else {
+                          const parsed = parseInt(val, 10);
+                          setEditPlannedQty(isNaN(parsed) ? '' : Math.max(0, parsed));
+                        }
+                      }}
+                      onBlur={() => {
+                        if (!editPlannedQty || Number(editPlannedQty) < 1) {
+                          setEditPlannedQty(1);
+                        }
+                      }}
                       required
                     />
                     <button
                       type="button"
                       className="number-stepper-btn"
-                      onClick={() => setEditPlannedQty((q) => q + 1)}
+                      onClick={() => setEditPlannedQty((q) => (Number(q) || 0) + 1)}
                     >
                       <Plus size={14} />
                     </button>
