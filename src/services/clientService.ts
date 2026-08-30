@@ -59,34 +59,6 @@ export const INITIAL_MOCK_CLIENTS: Client[] = [
       bik: '044525974',
       corrAccount: '30101810145250000974'
     }
-  },
-  {
-    id: 'cl_9923',
-    name: 'ОсОО "Азия Трейд Логистик"',
-    status: 'active',
-    activeShipmentsCount: 2,
-    totalActsCount: 5,
-    loginUsername: 'asia_trade',
-    createdAt: '2026-05-20T08:00:00Z',
-    updatedAt: '2026-08-04T16:45:00Z',
-    contact: {
-      contactPerson: 'Мамытов Бакыт Эркинович',
-      phone: '+996 (555) 321-654',
-      email: 'logistics@asiatrade.kg'
-    },
-    requisites: {
-      legalType: 'OsOO',
-      shortName: 'ОсОО "Азия Трейд"',
-      fullName: 'Общество с ограниченной ответственностью "Азия Трейд Логистик"',
-      inn: '01205202310123',
-      kpp: '012001001',
-      legalAddress: 'Кыргызская Республика, г. Бишкек, Октябрьский р-н, мкр 10, д. 15',
-      checkingAccount: '1033220005544332',
-      bankName: 'ОАО "МБАНК"',
-      bik: '103032',
-      corrAccount: '30111810400000073672',
-      swiftCode: 'KYRSKG22'
-    }
   }
 ];
 

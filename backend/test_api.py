@@ -32,7 +32,7 @@ def test_full_api_workflow():
     r = client.get("/api/v1/clients", headers=headers)
     assert r.status_code == 200
     clients_list = r.json()
-    assert len(clients_list) >= 3
+    assert len(clients_list) >= 2
     print(f"   ✅ Список клиентов получен: {len(clients_list)} контрагентов (первый: {clients_list[0]['name']})")
 
     # Создание нового клиента

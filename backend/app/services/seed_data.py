@@ -61,7 +61,7 @@ def seed_database(db: Session):
         db.add_all(users)
         db.commit()
 
-    # 2. Clients
+    # 2. Clients (2 аккуратных контрагента)
     if db.query(ClientModel).count() == 0:
         clients = [
             ClientModel(
@@ -84,8 +84,8 @@ def seed_database(db: Session):
                 phone="+7 (999) 123-45-67",
                 email="seller@fashion-store.ru",
                 login_username="client",
-                active_shipments_count=3,
-                total_acts_count=14
+                active_shipments_count=1,
+                total_acts_count=1
             ),
             ClientModel(
                 id="cl_9922",
@@ -105,43 +105,21 @@ def seed_database(db: Session):
                 phone="+7 (916) 987-65-43",
                 email="info@kidswear-wb.ru",
                 login_username="smirnov_kidswear",
-                active_shipments_count=1,
-                total_acts_count=8
-            ),
-            ClientModel(
-                id="cl_9923",
-                name='ОсОО "Азия Трейд Логистик"',
-                status="active",
-                legal_type="OsOO",
-                short_name='ОсОО "Азия Трейд"',
-                full_name='Общество с ограниченной ответственностью "Азия Трейд Логистик"',
-                inn="01205202310123",
-                kpp="012001001",
-                legal_address="Кыргызская Республика, г. Бишкек, Октябрьский р-н, мкр 10, д. 15",
-                checking_account="1033220005544332",
-                bank_name='ОАО "МБАНК"',
-                bik="103032",
-                corr_account="30111810400000073672",
-                swift_code="KYRSKG22",
-                contact_person="Мамытов Бакыт Эркинович",
-                phone="+996 (555) 321-654",
-                email="logistics@asiatrade.kg",
-                login_username="asia_trade",
-                active_shipments_count=2,
-                total_acts_count=5
+                active_shipments_count=0,
+                total_acts_count=0
             )
         ]
         db.add_all(clients)
         db.commit()
 
-    # 3. Shipments
+    # 3. Shipments (1 чистая поставка на приёмку)
     if db.query(ShipmentModel).count() == 0:
         shipment = ShipmentModel(
             id="shp_1001",
-            shipment_number="WB-2026-0805-01",
+            shipment_number="WB-2026-0830-01",
             client_id="cl_9921",
             client_name='ООО "Модный Гардероб"',
-            target_warehouses=["Коледино", "Тула", "Электросталь"],
+            target_warehouses=["Коледино"],
             status="receiving",
             operator_id="usr_op_01",
             operator_name="Алексей Смирнов"
@@ -155,36 +133,24 @@ def seed_database(db: Session):
                 shipment_id=shipment.id,
                 barcode="4601234567890",
                 sku="FUT-BLK-M",
-                title="Футболка базовая оверсайз Черная M",
+                title="Футболка базовая Черная M",
                 category="Одежда",
                 article="WB-FUT-01",
                 size="M",
-                planned_quantity=30,
-                scanned_quantity=24
+                planned_quantity=10,
+                scanned_quantity=0
             ),
             ShipmentItemModel(
                 id="item_2",
                 shipment_id=shipment.id,
                 barcode="4601234567891",
                 sku="HOOD-GRY-L",
-                title="Худи утепленное с капюшоном Серый L",
+                title="Худи утепленное Серый L",
                 category="Одежда",
                 article="WB-HD-02",
                 size="L",
-                planned_quantity=20,
-                scanned_quantity=15
-            ),
-            ShipmentItemModel(
-                id="item_3",
-                shipment_id=shipment.id,
-                barcode="4601234567892",
-                sku="DNM-BLU-S",
-                title="Джинсы прямой крой Синие S",
-                category="Одежда",
-                article="WB-DNM-03",
-                size="S",
-                planned_quantity=15,
-                scanned_quantity=15
+                planned_quantity=5,
+                scanned_quantity=0
             )
         ]
         db.add_all(items)
@@ -195,42 +161,36 @@ def seed_database(db: Session):
                 shipment_id=shipment.id,
                 box_number=1,
                 target_warehouse="Коледино",
-                items=[{"itemId": "item_1", "barcode": "4601234567890", "title": "Футболка базовая оверсайз Черная M", "quantity": 20}]
-            ),
-            PackingBoxModel(
-                id="box_2",
-                shipment_id=shipment.id,
-                box_number=2,
-                target_warehouse="Тула",
-                items=[{"itemId": "item_2", "barcode": "4601234567891", "title": "Худи утепленное с капюшоном Серый L", "quantity": 15}]
+                is_packed=False,
+                items=[]
             )
         ]
         db.add_all(boxes)
         db.commit()
 
-    # 4. Acts
+    # 4. Acts (1 готовый эталонный Акт)
     if db.query(ActModel).count() == 0:
         act = ActModel(
             id="act_7001",
-            act_number="АКТ-2026-0805-01",
+            act_number="АКТ-2026-0830-01",
             shipment_id="shp_1001",
-            shipment_number="WB-2026-0805-01",
-            date="2026-08-05",
+            shipment_number="WB-2026-0830-01",
+            date="2026-08-30",
             operator_name="Алексей Смирнов",
             client_id="cl_9921",
             client_name='ООО "Модный Гардероб"',
             client_requisites_text='Заказчик: ООО "Модный Гардероб", ИНН: 7701234567, КПП: 770101001, Адрес: г. Москва, ул. Тверская, д. 12, р/с: 40702810938000012345 в ПАО Сбербанк, БИК: 044525225',
             executor_requisites=OFFICIAL_EXECUTOR_REQUISITES,
             items=[
-                {"id": "item_act_1", "code": "srv_1", "name": "Прием товара", "price": 4, "quantity": 50, "amount": 200, "enabled": True},
-                {"id": "item_act_2", "code": "srv_2", "name": "Укладка в короб", "price": 2, "quantity": 50, "amount": 100, "enabled": True},
-                {"id": "item_act_3", "code": "srv_3", "name": "Маркировка ШК", "price": 8, "quantity": 50, "amount": 400, "enabled": True},
-                {"id": "item_act_7", "code": "srv_7", "name": "Упаковка", "price": 5, "quantity": 50, "amount": 250, "enabled": True},
-                {"id": "item_act_8", "code": "srv_8", "name": "Короб", "price": 180, "quantity": 2, "amount": 360, "enabled": True},
+                {"id": "item_act_1", "code": "srv_1", "name": "Прием товара", "price": 4, "quantity": 15, "amount": 60, "enabled": True},
+                {"id": "item_act_2", "code": "srv_2", "name": "Укладка в короб", "price": 2, "quantity": 15, "amount": 30, "enabled": True},
+                {"id": "item_act_3", "code": "srv_3", "name": "Маркировка ШК", "price": 8, "quantity": 15, "amount": 120, "enabled": True},
+                {"id": "item_act_7", "code": "srv_7", "name": "Упаковка", "price": 5, "quantity": 15, "amount": 75, "enabled": True},
+                {"id": "item_act_8", "code": "srv_8", "name": "Короб", "price": 180, "quantity": 1, "amount": 180, "enabled": True},
                 {"id": "item_act_12", "code": "srv_12", "name": "Доставка до Москвы", "price": 5000, "quantity": 1, "amount": 5000, "enabled": True},
                 {"id": "item_act_13", "code": "srv_13", "name": "Отгрузка на склад", "price": 1500, "quantity": 1, "amount": 1500, "enabled": True}
             ],
-            total_sum=7810.0,
+            total_sum=6965.0,
             status="signed"
         )
         db.add(act)

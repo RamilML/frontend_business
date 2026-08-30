@@ -7,29 +7,21 @@ const STORAGE_KEY_SHIPMENTS = 'ff_assistant_shipments_data';
 export const INITIAL_MOCK_SHIPMENTS: Shipment[] = [
   {
     id: 'shp_1001',
-    shipmentNumber: 'WB-2026-0805-01',
+    shipmentNumber: 'WB-2026-0830-01',
     clientId: 'cl_9921',
     clientName: 'ООО "Модный Гардероб"',
-    targetWarehouses: ['Коледино', 'Тула', 'Электросталь'],
+    targetWarehouses: ['Коледино'],
     status: 'receiving',
-    createdAt: '2026-08-05T09:00:00Z',
-    updatedAt: '2026-08-05T14:30:00Z',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     operatorId: 'usr_op_01',
     operatorName: 'Алексей Смирнов',
     boxes: [
       {
         boxNumber: 1,
         targetWarehouse: 'Коледино',
-        items: [
-          { itemId: 'item_1', barcode: '4601234567890', title: 'Футболка базовая оверсайз Черная M', quantity: 20 }
-        ]
-      },
-      {
-        boxNumber: 2,
-        targetWarehouse: 'Тула',
-        items: [
-          { itemId: 'item_2', barcode: '4601234567891', title: 'Худи утепленное с капюшоном Серый L', quantity: 15 }
-        ]
+        isPacked: false,
+        items: []
       }
     ],
     items: [
@@ -37,58 +29,22 @@ export const INITIAL_MOCK_SHIPMENTS: Shipment[] = [
         id: 'item_1',
         barcode: '4601234567890',
         sku: 'FUT-BLK-M',
-        title: 'Футболка базовая оверсайз Черная M',
+        title: 'Футболка базовая Черная M',
         category: 'Одежда',
         article: 'WB-FUT-01',
         size: 'M',
-        plannedQuantity: 30,
-        scannedQuantity: 24,
-        lastScannedAt: new Date().toISOString()
+        plannedQuantity: 10,
+        scannedQuantity: 0
       },
       {
         id: 'item_2',
         barcode: '4601234567891',
         sku: 'HOOD-GRY-L',
-        title: 'Худи утепленное с капюшоном Серый L',
+        title: 'Худи утепленное Серый L',
         category: 'Одежда',
         article: 'WB-HD-02',
         size: 'L',
-        plannedQuantity: 20,
-        scannedQuantity: 15,
-        lastScannedAt: new Date(Date.now() - 300000).toISOString()
-      },
-      {
-        id: 'item_3',
-        barcode: '4601234567892',
-        sku: 'DNM-BLU-S',
-        title: 'Джинсы прямой крой Синие S',
-        category: 'Одежда',
-        article: 'WB-DNM-03',
-        size: 'S',
-        plannedQuantity: 15,
-        scannedQuantity: 15,
-        lastScannedAt: new Date(Date.now() - 600000).toISOString()
-      }
-    ]
-  },
-  {
-    id: 'shp_1002',
-    shipmentNumber: 'WB-2026-0804-02',
-    clientId: 'cl_9922',
-    clientName: 'ИП Смирнов В.А. (KidsWear)',
-    targetWarehouses: ['Казань'],
-    status: 'draft',
-    createdAt: '2026-08-04T11:00:00Z',
-    updatedAt: '2026-08-04T12:00:00Z',
-    boxes: [],
-    items: [
-      {
-        id: 'item_10',
-        barcode: '4609999888111',
-        sku: 'KID-BODY-RED-68',
-        title: 'Боди детское х/б Красное 68 см',
-        category: 'Детская одежда',
-        plannedQuantity: 50,
+        plannedQuantity: 5,
         scannedQuantity: 0
       }
     ]
