@@ -47,6 +47,25 @@ export const ClientDashboard: React.FC = () => {
 
   const totalBoxes = shipments.reduce((acc, s) => acc + s.boxes.length, 0);
 
+  const getStatusBadge = (status: Shipment['status']) => {
+    switch (status) {
+      case 'draft':
+        return <span className="badge badge-manager" style={{ opacity: 0.85 }}>📝 Черновик</span>;
+      case 'receiving':
+        return <span className="badge badge-operator">🟡 В приёмке</span>;
+      case 'packing':
+        return <span className="badge badge-manager">📦 В упаковке</span>;
+      case 'ready_to_ship':
+        return <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981' }}>🟢 Готова к отгрузке</span>;
+      case 'shipped':
+        return <span className="badge badge-client">🚚 Отгружена</span>;
+      case 'completed':
+        return <span className="badge badge-admin">🏁 Завершена</span>;
+      default:
+        return <span className="badge">{status}</span>;
+    }
+  };
+
   return (
     <div className="dashboard-container">
       {/* Client Header */}
@@ -109,7 +128,7 @@ export const ClientDashboard: React.FC = () => {
             <FileText size={20} color="#3b82f6" />
           </div>
           <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>{acts.length} документа</div>
-          <span style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Скачать Excel / PDF $\rightarrow$</span>
+          <span style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Скачать Excel / PDF →</span>
         </div>
       </div>
 
@@ -140,7 +159,7 @@ export const ClientDashboard: React.FC = () => {
                     <span style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary)' }}>
                       {shp.shipmentNumber}
                     </span>
-                    <span className="badge badge-operator">{shp.status}</span>
+                    {getStatusBadge(shp.status)}
                   </div>
 
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
@@ -155,10 +174,20 @@ export const ClientDashboard: React.FC = () => {
                   <div style={{ marginBottom: '1rem' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
                       <span>Сборка поставки:</span>
-                      <b>{scanned} / {planned} шт. ({pct}%)</b>
+                      <b style={{ color: pct >= 100 ? '#10b981' : 'var(--primary)' }}>
+                        {scanned} / {planned} шт. ({pct}%)
+                      </b>
                     </div>
-                    <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 999 }}>
-                      <div style={{ width: `${pct}%`, height: '100%', background: '#8b5cf6', borderRadius: 999 }} />
+                    <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 999, overflow: 'hidden' }}>
+                      <div
+                        style={{
+                          width: `${Math.min(100, Math.max(0, pct))}%`,
+                          height: '100%',
+                          background: pct >= 100 ? '#10b981' : '#8b5cf6',
+                          borderRadius: 999,
+                          transition: 'width 0.3s ease'
+                        }}
+                      />
                     </div>
                   </div>
 
