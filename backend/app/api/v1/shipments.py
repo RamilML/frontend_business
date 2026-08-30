@@ -177,16 +177,21 @@ def add_item_to_shipment(id: str, it: ShipmentItemBase, db: Session = Depends(ge
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
 
+    barcode_clean = it.barcode.strip()
+    sku_val = it.sku.strip() if it.sku else f"SKU-{barcode_clean}"
+    title_val = it.title.strip() if it.title else f"Товар {barcode_clean}"
+    plan_val = max(1, int(it.plannedQuantity or 1))
+
     item_model = ShipmentItemModel(
         shipment_id=shipment.id,
-        barcode=it.barcode,
-        sku=it.sku or f"SKU-{it.barcode}",
-        title=it.title,
+        barcode=barcode_clean,
+        sku=sku_val,
+        title=title_val,
         category=it.category,
         article=it.article,
         size=it.size,
         brand=it.brand,
-        planned_quantity=it.plannedQuantity or 10,
+        planned_quantity=plan_val,
         scanned_quantity=1,
         last_scanned_at=datetime.utcnow()
     )
@@ -194,7 +199,20 @@ def add_item_to_shipment(id: str, it: ShipmentItemBase, db: Session = Depends(ge
     shipment.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(item_model)
-    return item_model
+    
+    return ShipmentItemResponse(
+        id=item_model.id,
+        barcode=item_model.barcode,
+        sku=item_model.sku,
+        title=item_model.title,
+        category=item_model.category,
+        article=item_model.article,
+        size=item_model.size,
+        brand=item_model.brand,
+        plannedQuantity=item_model.planned_quantity,
+        scannedQuantity=item_model.scanned_quantity,
+        lastScannedAt=item_model.last_scanned_at
+    )
 
 @router.post("/{id}/boxes")
 def create_box(id: str, req: CreateBoxRequest, db: Session = Depends(get_db)):

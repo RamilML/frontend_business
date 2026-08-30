@@ -4,16 +4,24 @@ from datetime import datetime
 
 class ShipmentItemBase(BaseModel):
     barcode: str
+    sku: Optional[str] = None
+    title: str
+    category: Optional[str] = None
+    article: Optional[str] = None
+    size: Optional[str] = None
+    brand: Optional[str] = None
+    plannedQuantity: Optional[int] = 1
+
+class ShipmentItemResponse(BaseModel):
+    id: str
+    barcode: str
     sku: str
     title: str
     category: Optional[str] = None
     article: Optional[str] = None
     size: Optional[str] = None
     brand: Optional[str] = None
-    plannedQuantity: int = 0
-
-class ShipmentItemResponse(ShipmentItemBase):
-    id: str
+    plannedQuantity: int = 1
     scannedQuantity: int = 0
     lastScannedAt: Optional[datetime] = None
 

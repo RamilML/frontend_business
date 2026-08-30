@@ -15,7 +15,6 @@ import {
   Layers,
   Camera,
   PlusCircle,
-  HelpCircle,
   PackagePlus
 } from 'lucide-react';
 
@@ -37,7 +36,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
   const [newItemTitle, setNewItemTitle] = useState('');
   const [newItemSku, setNewItemSku] = useState('');
-  const [newItemPlannedQty, setNewItemPlannedQty] = useState<number>(10);
+  const [newItemPlannedQty, setNewItemPlannedQty] = useState<number>(1);
 
   // TSD Keyboard Buffer Listener
   const keyBufferRef = useRef<string>('');
@@ -125,7 +124,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
         setUnknownBarcode(cleanCode);
         setNewItemTitle('');
         setNewItemSku(`SKU-${cleanCode}`);
-        setNewItemPlannedQty(10);
+        setNewItemPlannedQty(1);
       }
     }
   };
@@ -141,14 +140,15 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const handleAddNewUnlistedItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (unknownBarcode && newItemTitle.trim()) {
-      const barcodeToAdd = unknownBarcode;
+      const barcodeToAdd = unknownBarcode.trim();
       const titleToAdd = newItemTitle.trim();
-      const plannedToAdd = Number(newItemPlannedQty) || 10;
+      const plannedToAdd = Math.max(1, Number(newItemPlannedQty) || 1);
       const skuToAdd = newItemSku.trim() || `SKU-${barcodeToAdd}`;
 
       setUnknownBarcode(null);
       setNewItemTitle('');
       setNewItemSku('');
+      setNewItemPlannedQty(1);
 
       try {
         const createdItem = await ShipmentService.addItemToShipment(shipmentId, {
@@ -158,26 +158,28 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
           sku: skuToAdd
         });
 
-        // Optimistically insert new item into state immediately
+        // Instantly update state in React
         setShipment((prev) => {
           if (!prev) return prev;
-          if (prev.items.some((it) => it.barcode === createdItem.barcode)) {
-            return prev;
-          }
+          const otherItems = prev.items.filter((it) => it.barcode !== createdItem.barcode && it.id !== createdItem.id);
           return {
             ...prev,
-            items: [createdItem, ...prev.items]
+            items: [createdItem, ...otherItems]
           };
         });
 
         setLastScanResult({
           success: true,
           item: createdItem,
-          message: `Новый товар добавлен и принят: ${createdItem.title} (1/${createdItem.plannedQuantity} шт.)`
+          message: `Новый товар добавлен и принят: ${createdItem.title} (${createdItem.scannedQuantity || 1}/${createdItem.plannedQuantity} шт.)`
         });
         triggerFlash('success');
 
-        loadShipment(false);
+        // Background sync to ensure fresh state from server
+        const fresh = await ShipmentService.getShipmentById(shipmentId);
+        if (fresh) {
+          setShipment(fresh);
+        }
       } catch (err) {
         console.error('Failed to add item:', err);
       }
@@ -476,7 +478,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
             </div>
             
             <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-              Штрихкод <b style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary)', background: 'rgba(255,255,255,0.08)', padding: '0.2rem 0.4rem', borderRadius: 4 }}>{unknownBarcode}</b> не найден в плане этой поставки. Введите название, чтобы принять его:
+              Штрихкод <b style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary)', background: 'rgba(255,255,255,0.08)', padding: '0.2rem 0.4rem', borderRadius: 4 }}>{unknownBarcode}</b> не найден в плане этой поставки. Введите данные, чтобы принять его:
             </p>
 
             <form onSubmit={handleAddNewUnlistedItem}>
@@ -512,7 +514,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                     min="1"
                     className="form-input"
                     value={newItemPlannedQty}
-                    onChange={(e) => setNewItemPlannedQty(Number(e.target.value))}
+                    onChange={(e) => setNewItemPlannedQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
                     required
                   />
                 </div>
@@ -527,7 +529,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                   Отмена
                 </button>
                 <button type="submit" className="btn-primary" style={{ width: 'auto' }}>
-                  <PlusCircle size={16} /> Добавить и принять 1 шт.
+                  <PlusCircle size={16} /> Добавить и принять {newItemPlannedQty || 1} шт.
                 </button>
               </div>
             </form>
