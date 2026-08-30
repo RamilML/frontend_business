@@ -5,6 +5,7 @@ import { Act } from '../../types/act';
 import { ShipmentService } from '../../services/shipmentService';
 import { ActService } from '../../services/actService';
 import { ExportUtils } from '../../utils/exportUtils';
+import { PackingSlipPrintModal } from '../packing/PackingSlipPrintModal';
 import {
   Building2,
   Package,
@@ -26,6 +27,7 @@ export const ClientDashboard: React.FC = () => {
   const [acts, setActs] = useState<Act[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'boxes' | 'acts'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
+  const [printShipment, setPrintShipment] = useState<Shipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -208,45 +210,148 @@ export const ClientDashboard: React.FC = () => {
       {/* TAB 2: Boxes & WB Warehouses breakdown */}
       {activeTab === 'boxes' && (
         <div className="card" style={{ padding: '1.25rem' }}>
-          <h3 className="card-title">
-            <Box size={18} color="#8b5cf6" /> Декомпозиция коробок по складам назначения Wildberries
-          </h3>
+          <div style={{ marginBottom: '1.25rem' }}>
+            <h3 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Box size={18} color="#8b5cf6" /> Декомпозиция коробок по складам назначения Wildberries
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '0.25rem 0 0 0' }}>
+              Точный поштучный состав каждой коробки, штрихкоды и целевой склад маркетплейса
+            </p>
+          </div>
 
-          {shipments.map((shp) => (
-            <div key={shp.id} style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem' }}>
-              <div style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--primary)', marginBottom: '0.5rem' }}>
-                Поставка {shp.shipmentNumber} (Коробок: {shp.boxes.length} шт.)
-              </div>
+          {shipments.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+              Нет активных поставок с коробками.
+            </div>
+          ) : (
+            shipments.map((shp) => {
+              const totalItemsInAllBoxes = shp.boxes.reduce(
+                (sum, b) => sum + b.items.reduce((s, it) => s + it.quantity, 0),
+                0
+              );
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
-                {shp.boxes.map((box) => (
-                  <div
-                    key={box.boxNumber}
-                    style={{
-                      background: 'rgba(15, 23, 42, 0.6)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-md)',
-                      padding: '0.85rem'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
-                      <span>Коробка №{box.boxNumber}</span>
-                      <span style={{ color: '#93c5fd' }}>Склад: {box.targetWarehouse}</span>
+              return (
+                <div key={shp.id} style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border)', paddingBottom: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div>
+                      <span style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary)' }}>
+                        Поставка {shp.shipmentNumber}
+                      </span>
+                      <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginLeft: '0.75rem' }}>
+                        Склады WB: <b>{shp.targetWarehouses.join(', ')}</b> • Коробок: <b>{shp.boxes.length} шт.</b> • Упаковано: <b style={{ color: '#10b981' }}>{totalItemsInAllBoxes} шт.</b>
+                      </span>
                     </div>
 
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      {box.items.map((it, idx) => (
-                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
-                          <span>{it.title}</span>
-                          <b>{it.quantity} шт.</b>
-                        </div>
-                      ))}
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => setPrintShipment(shp)}
+                        style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}
+                      >
+                        <Printer size={13} /> Печать упаковочного листа
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => ExportUtils.exportPackingToExcel(shp)}
+                        style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', borderColor: '#10b981', color: '#10b981' }}
+                      >
+                        <FileSpreadsheet size={13} /> Скачать Excel
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          ))}
+
+                  {shp.boxes.length === 0 ? (
+                    <div style={{ padding: '1.5rem', background: 'rgba(15, 23, 42, 0.4)', borderRadius: 'var(--radius-md)', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      Оператор склада ещё не создал коробки для этой поставки.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '0.85rem' }}>
+                      {shp.boxes.map((box) => {
+                        const totalInBox = box.items.reduce((acc, it) => acc + it.quantity, 0);
+
+                        return (
+                          <div
+                            key={box.boxNumber}
+                            style={{
+                              background: 'rgba(15, 23, 42, 0.7)',
+                              border: '1px solid var(--border)',
+                              borderRadius: 'var(--radius-md)',
+                              padding: '1rem',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between'
+                            }}
+                          >
+                            <div>
+                              {/* Box Header */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                  <Box size={16} color="var(--primary)" /> Коробка №{box.boxNumber}
+                                </div>
+                                <span style={{ fontSize: '0.75rem', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', padding: '0.15rem 0.45rem', borderRadius: 4 }}>
+                                  Склад: {box.targetWarehouse}
+                                </span>
+                              </div>
+
+                              {/* Seal Status & Quantity */}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.6rem', paddingBottom: '0.4rem', borderBottom: '1px solid rgba(255, 255, 255, 0.07)' }}>
+                                <span>
+                                  {box.isPacked ? (
+                                    <b style={{ color: '#10b981' }}>🔒 Запечатана</b>
+                                  ) : (
+                                    <span style={{ color: '#f59e0b' }}>🔓 В процессе сборки</span>
+                                  )}
+                                </span>
+                                <span>В коробке: <b style={{ color: totalInBox > 0 ? '#10b981' : 'var(--text-muted)' }}>{totalInBox} шт.</b></span>
+                              </div>
+
+                              {/* Box Items */}
+                              {box.items.length === 0 ? (
+                                <div style={{ padding: '1rem 0.5rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>
+                                  📦 Коробка пуста (ожидает укладки товаров оператором)
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                                  {box.items.map((it, idx) => (
+                                    <div
+                                      key={idx}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        fontSize: '0.82rem',
+                                        background: 'rgba(30, 41, 59, 0.4)',
+                                        padding: '0.4rem 0.6rem',
+                                        borderRadius: 6
+                                      }}
+                                    >
+                                      <div>
+                                        <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{it.title}</div>
+                                        {it.barcode && (
+                                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                                            ШК: {it.barcode}
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div style={{ fontWeight: 700, color: 'var(--primary)', fontFamily: 'var(--font-mono)', fontSize: '0.9rem', marginLeft: '0.5rem' }}>
+                                        {it.quantity} шт.
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
@@ -318,6 +423,15 @@ export const ClientDashboard: React.FC = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Packing Slip Print Modal */}
+      {printShipment && (
+        <PackingSlipPrintModal
+          isOpen={!!printShipment}
+          shipment={printShipment}
+          onClose={() => setPrintShipment(null)}
+        />
       )}
     </div>
   );
