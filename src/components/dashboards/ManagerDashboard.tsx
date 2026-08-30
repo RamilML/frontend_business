@@ -1,9 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Client } from '../../types/client';
+import { Shipment, CreateShipmentDto } from '../../types/shipment';
+import { Act } from '../../types/act';
+import { ClientService } from '../../services/clientService';
+import { ShipmentService } from '../../services/shipmentService';
+import { ActService } from '../../services/actService';
 import { ClientList } from '../clients/ClientList';
-import { ClientSelectModal } from '../clients/ClientSelectModal';
 import { ActListScreen } from '../acts/ActListScreen';
+import { ActGeneratorScreen } from '../acts/ActGeneratorScreen';
 import { DocumentRegistryScreen } from '../documents/DocumentRegistryScreen';
+import { NewShipmentModal } from '../scanning/NewShipmentModal';
+import { EditShipmentModal } from '../scanning/EditShipmentModal';
+import { BarcodeScanScreen } from '../scanning/BarcodeScanScreen';
 import {
   ShieldCheck,
   Users,
@@ -12,17 +20,149 @@ import {
   Building2,
   TrendingUp,
   LayoutDashboard,
-  Download
+  Download,
+  Truck,
+  Box,
+  CheckCircle2,
+  Search,
+  Filter,
+  Eye,
+  CheckCheck,
+  RefreshCw,
+  Sparkles,
+  ExternalLink,
+  DollarSign,
+  PackageCheck,
+  Play,
+  Edit2
 } from 'lucide-react';
 
 export const ManagerDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'acts' | 'documents'>('dashboard');
-  const [isSelectClientModalOpen, setIsSelectClientModalOpen] = useState(false);
-  const [selectedClientForShipment, setSelectedClientForShipment] = useState<Client | null>(null);
+  
+  // Data state
+  const [clients, setClients] = useState<Client[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [acts, setActs] = useState<Act[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleStartShipment = (client: Client) => {
-    setSelectedClientForShipment(client);
-    alert(`Поставка для клиента "${client.name}" открыта! Следующий шаг: сканирование штрихкодов и привязка коробок.`);
+  // Filters state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedClientFilter, setSelectedClientFilter] = useState<string>('all');
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
+
+  // Sub-screens & Modals
+  const [isNewShipmentOpen, setIsNewShipmentOpen] = useState(false);
+  const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
+  const [activeShipmentId, setActiveShipmentId] = useState<string | null>(null);
+  const [activeShipmentForAct, setActiveShipmentForAct] = useState<Shipment | null>(null);
+
+  const loadAllData = async () => {
+    setIsLoading(true);
+    try {
+      const [clientsData, shipmentsData, actsData] = await Promise.all([
+        ClientService.getClients(),
+        ShipmentService.getShipments(),
+        ActService.getActs()
+      ]);
+      setClients(clientsData || []);
+      setShipments(shipmentsData || []);
+      setActs(actsData || []);
+    } catch (e) {
+      console.warn('Load manager data error:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
+  const handleCreateShipment = async (dto: CreateShipmentDto) => {
+    await ShipmentService.createShipment(dto);
+    await loadAllData();
+    setIsNewShipmentOpen(false);
+  };
+
+  const handleCompleteShipment = async (shipmentId: string) => {
+    if (window.confirm('Завершить поставку и закрыть работу по ней?')) {
+      await ShipmentService.updateShipment(shipmentId, { status: 'completed' });
+      await loadAllData();
+    }
+  };
+
+  // If inspecting a specific shipment in scan/packing view
+  if (activeShipmentId) {
+    return (
+      <BarcodeScanScreen
+        shipmentId={activeShipmentId}
+        onBack={() => {
+          setActiveShipmentId(null);
+          loadAllData();
+        }}
+      />
+    );
+  }
+
+  // If generating an Act for a specific shipment
+  if (activeShipmentForAct) {
+    return (
+      <ActGeneratorScreen
+        shipment={activeShipmentForAct}
+        onBack={() => {
+          setActiveShipmentForAct(null);
+          loadAllData();
+        }}
+        onSaved={() => {
+          setActiveShipmentForAct(null);
+          loadAllData();
+        }}
+      />
+    );
+  }
+
+  // Calculations
+  const activeShipments = shipments.filter((s) => s.status !== 'completed');
+  const readyOrShippedCount = shipments.filter((s) => s.status === 'ready_to_ship' || s.status === 'shipped').length;
+  const totalRevenue = acts.reduce((acc, a) => acc + (a.totalSum || 0), 0);
+
+  // Filtered shipments
+  const filteredShipments = shipments.filter((shp) => {
+    if (selectedClientFilter !== 'all' && shp.clientId !== selectedClientFilter) {
+      return false;
+    }
+    if (selectedStatusFilter !== 'all') {
+      if (selectedStatusFilter === 'active' && shp.status === 'completed') return false;
+      if (selectedStatusFilter !== 'active' && shp.status !== selectedStatusFilter) return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const matchNum = shp.shipmentNumber.toLowerCase().includes(q);
+      const matchClient = shp.clientName.toLowerCase().includes(q);
+      const matchWh = shp.targetWarehouses.some((w) => w.toLowerCase().includes(q));
+      if (!matchNum && !matchClient && !matchWh) return false;
+    }
+    return true;
+  });
+
+  const getStatusBadge = (status: Shipment['status']) => {
+    switch (status) {
+      case 'draft':
+        return <span className="badge badge-manager" style={{ opacity: 0.85 }}>📝 Черновик</span>;
+      case 'receiving':
+        return <span className="badge badge-operator">🟡 В приёмке</span>;
+      case 'packing':
+        return <span className="badge badge-manager">📦 В упаковке</span>;
+      case 'ready_to_ship':
+        return <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981' }}>🟢 Готова к отгрузке</span>;
+      case 'shipped':
+        return <span className="badge badge-client">🚚 Отгружена</span>;
+      case 'completed':
+        return <span className="badge badge-admin">🏁 Завершена</span>;
+      default:
+        return <span className="badge">{status}</span>;
+    }
   };
 
   return (
@@ -57,7 +197,7 @@ export const ManagerDashboard: React.FC = () => {
             color: activeTab === 'clients' ? 'var(--primary)' : 'var(--text-muted)'
           }}
         >
-          <Building2 size={15} /> Справочник Клиентов
+          <Building2 size={15} /> Справочник Клиентов ({clients.length})
         </button>
 
         <button
@@ -68,7 +208,7 @@ export const ManagerDashboard: React.FC = () => {
             color: activeTab === 'acts' ? 'var(--primary)' : 'var(--text-muted)'
           }}
         >
-          <FileText size={15} /> Акты выполненных работ (13 услуг)
+          <FileText size={15} /> Акты выполненных работ ({acts.length})
         </button>
 
         <button
@@ -84,27 +224,30 @@ export const ManagerDashboard: React.FC = () => {
       </div>
 
       {activeTab === 'clients' ? (
-        <ClientList onSelectClientForShipment={handleStartShipment} />
+        <ClientList onSelectClientForShipment={() => setIsNewShipmentOpen(true)} />
       ) : activeTab === 'acts' ? (
         <ActListScreen />
       ) : activeTab === 'documents' ? (
         <DocumentRegistryScreen />
       ) : (
         <div className="dashboard-container">
+          {/* Header Bar */}
           <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>Панель Менеджера Склада</h2>
+              <h2 style={{ fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <ShieldCheck color="var(--primary)" size={24} /> Панель Менеджера Склада
+              </h2>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                Управление поставками, карточками контрагентов и генерация Актов выполненных работ
+                Мониторинг приёмки складом в реальном времени, управление поставщиками и расчёт стоимости
               </p>
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button className="btn-secondary" onClick={() => setActiveTab('documents')}>
-                <Download size={16} /> Выгрузка (Excel/Word)
+              <button className="btn-secondary" onClick={loadAllData} title="Обновить данные">
+                <RefreshCw size={16} /> Обновить
               </button>
               <button 
                 className="btn-primary" 
-                onClick={() => setIsSelectClientModalOpen(true)}
+                onClick={() => setIsNewShipmentOpen(true)}
                 style={{ width: 'auto' }}
               >
                 <PlusCircle size={16} /> Создать Поставку
@@ -112,34 +255,30 @@ export const ManagerDashboard: React.FC = () => {
             </div>
           </div>
 
-          {selectedClientForShipment && (
-            <div className="alert-info" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <b>Выбран контрагент:</b> {selectedClientForShipment.name} (ИНН: {selectedClientForShipment.requisites.inn})
-              </div>
-              <button className="btn-secondary" onClick={() => setSelectedClientForShipment(null)} style={{ fontSize: '0.75rem' }}>
-                Сбросить выбор
-              </button>
-            </div>
-          )}
-
-          {/* Stats grid */}
+          {/* Dynamic Stats Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
             <div className="card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('clients')}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span>Активных контрагентов</span>
+                <span>Активных поставщиков</span>
                 <Users size={20} color="#3b82f6" />
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>3 контрагента</div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>Справочник карточек $\rightarrow$</span>
+              <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+                {clients.length} контрагентов
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>Открыть базу клиентов →</span>
             </div>
 
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-                <span>Поставок в работе</span>
+                <span>Поставок в работе склада</span>
                 <TrendingUp size={20} color="var(--primary)" />
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>6 поставок</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+                {activeShipments.length} в работе
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {readyOrShippedCount} готовы к расчету
+              </span>
             </div>
 
             <div className="card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('acts')}>
@@ -147,36 +286,262 @@ export const ManagerDashboard: React.FC = () => {
                 <span>Сформировано Актов</span>
                 <FileText size={20} color="#10b981" />
               </div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>27 актов</div>
-              <span style={{ fontSize: '0.75rem', color: '#10b981' }}>Реестр и печать актов $\rightarrow$</span>
+              <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+                {acts.length} актов
+              </div>
+              <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>
+                {totalRevenue.toLocaleString()} сом/руб. выручки →
+              </span>
             </div>
           </div>
 
+          {/* Real-Time Shipments Registry Section */}
           <div className="card">
-            <h3 className="card-title">
-              <ShieldCheck size={18} color="#3b82f6" /> Модуль выгрузки и хранения документов (п. 10 & 11 ТЗ)
-            </h3>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Все сформированные документы (списки товаров по коробкам и складам Wildberries, Акты выполненных работ) сохраняются внутри приложения и доступны для моментального экспорта в Excel (.csv/.xlsx), Word (.doc) и PDF.
-            </p>
-            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-              <button className="btn-secondary" onClick={() => setActiveTab('documents')}>
-                <Download size={16} /> Единый реестр выгрузок
-              </button>
-              <button className="btn-secondary" onClick={() => setActiveTab('acts')}>
-                <FileText size={16} /> Создать Акт выполненных работ
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h3 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <PackageCheck size={18} color="var(--primary)" /> Реестр поставок поставщиков (План / Факт / Статус)
+                </h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: '0.2rem 0 0 0' }}>
+                  Данные автоматически обновляются по мере сканирования и упаковки операторами склада
+                </p>
+              </div>
+
+              {/* Filters & Search Toolbar */}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Search */}
+                <div className="input-with-icon" style={{ minWidth: 200 }}>
+                  <Search className="input-icon" size={15} />
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Поиск поставки..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    style={{ padding: '0.4rem 0.6rem 0.4rem 2.2rem', fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                {/* Client Filter */}
+                <select
+                  className="form-input"
+                  value={selectedClientFilter}
+                  onChange={(e) => setSelectedClientFilter(e.target.value)}
+                  style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', width: 'auto' }}
+                >
+                  <option value="all">Все поставщики ({clients.length})</option>
+                  {clients.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Status Filter */}
+                <select
+                  className="form-input"
+                  value={selectedStatusFilter}
+                  onChange={(e) => setSelectedStatusFilter(e.target.value)}
+                  style={{ padding: '0.4rem 0.6rem', fontSize: '0.85rem', width: 'auto' }}
+                >
+                  <option value="all">Все статусы</option>
+                  <option value="active">Только в работе</option>
+                  <option value="receiving">🟡 В приёмке</option>
+                  <option value="packing">📦 В упаковке</option>
+                  <option value="ready_to_ship">🟢 Готова к отгрузке</option>
+                  <option value="shipped">🚚 Отгружена</option>
+                  <option value="completed">🏁 Завершена</option>
+                </select>
+              </div>
             </div>
+
+            {/* Shipments Table */}
+            {isLoading ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                Загрузка сводных данных по поставкам...
+              </div>
+            ) : filteredShipments.length === 0 ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                По заданным фильтрам поставок не найдено. Нажмите «Создать Поставку», чтобы открыть приёмку.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                      <th style={{ padding: '0.75rem 1rem' }}>Номер поставки</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Поставщик (Селлер)</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Склады WB</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Прогресс склада (План / Факт)</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Коробки</th>
+                      <th style={{ padding: '0.75rem 1rem' }}>Статус</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Действия менеджера</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredShipments.map((shp) => {
+                      const totalPlanned = shp.items.reduce((acc, it) => acc + it.plannedQuantity, 0);
+                      const totalScanned = shp.items.reduce((acc, it) => acc + it.scannedQuantity, 0);
+                      const percent = totalPlanned > 0 ? Math.round((totalScanned / totalPlanned) * 100) : 0;
+                      const sealedBoxes = shp.boxes.filter((b) => b.isPacked).length;
+
+                      return (
+                        <tr key={shp.id} style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.4)' }}>
+                          {/* Shipment Number */}
+                          <td style={{ padding: '0.85rem 1rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--primary)' }}>
+                            {shp.shipmentNumber}
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+                              {new Date(shp.createdAt).toLocaleDateString('ru-RU')}
+                            </div>
+                          </td>
+
+                          {/* Client Name */}
+                          <td style={{ padding: '0.85rem 1rem' }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                              <Building2 size={13} color="var(--primary)" /> {shp.clientName}
+                            </div>
+                            {shp.operatorName && (
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                                Оператор: {shp.operatorName}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* WB Warehouses */}
+                          <td style={{ padding: '0.85rem 1rem' }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                              {shp.targetWarehouses.map((wh) => (
+                                <span key={wh} style={{ fontSize: '0.75rem', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid var(--border)', padding: '0.1rem 0.35rem', borderRadius: 4 }}>
+                                  {wh}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+
+                          {/* Progress */}
+                          <td style={{ padding: '0.85rem 1rem', minWidth: 160 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                              <span>Принято: <b>{totalScanned}/{totalPlanned} шт.</b></span>
+                              <b style={{ color: percent >= 100 ? '#10b981' : 'var(--primary)' }}>{percent}%</b>
+                            </div>
+                            <div style={{ height: 5, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 999 }}>
+                              <div
+                                style={{
+                                  width: `${Math.min(100, percent)}%`,
+                                  height: '100%',
+                                  background: percent >= 100 ? '#10b981' : 'var(--primary)',
+                                  borderRadius: 999
+                                }}
+                              />
+                            </div>
+                          </td>
+
+                          {/* Boxes */}
+                          <td style={{ padding: '0.85rem 1rem' }}>
+                            <span style={{ fontWeight: 600 }}>{shp.boxes.length} шт.</span>
+                            {shp.boxes.length > 0 && (
+                              <div style={{ fontSize: '0.72rem', color: sealedBoxes === shp.boxes.length ? '#34d399' : 'var(--text-muted)' }}>
+                                Запечатано: {sealedBoxes}/{shp.boxes.length}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Status */}
+                          <td style={{ padding: '0.85rem 1rem' }}>
+                            {getStatusBadge(shp.status)}
+                          </td>
+
+                          {/* Actions */}
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                              {/* Create Act Button */}
+                              <button
+                                type="button"
+                                className="btn-primary"
+                                onClick={() => setActiveShipmentForAct(shp)}
+                                style={{
+                                  padding: '0.35rem 0.65rem',
+                                  fontSize: '0.78rem',
+                                  background: '#10b981',
+                                  borderColor: '#10b981',
+                                  color: '#fff',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem'
+                                }}
+                                title="Сформировать Акт выполненных работ на основе принятых товаров и коробок"
+                              >
+                                <FileText size={13} /> Сформировать Акт
+                              </button>
+
+                              {/* Inspect / Scan Screen */}
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => setActiveShipmentId(shp.id)}
+                                style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem' }}
+                                title="Открыть поставку (просмотр сканера и коробок)"
+                              >
+                                <Eye size={13} />
+                              </button>
+
+                              {/* Edit */}
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                onClick={() => setEditingShipment(shp)}
+                                style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem', color: '#38bdf8' }}
+                                title="Редактировать поставку"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+
+                              {/* Complete */}
+                              {shp.status === 'shipped' && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => handleCompleteShipment(shp.id)}
+                                  style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem', color: '#34d399' }}
+                                  title="Закрыть и завершить поставку"
+                                >
+                                  <CheckCheck size={13} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Select client modal */}
-      <ClientSelectModal
-        isOpen={isSelectClientModalOpen}
-        onClose={() => setIsSelectClientModalOpen(false)}
-        onSelectClient={handleStartShipment}
+      {/* New Shipment Wizard Modal */}
+      <NewShipmentModal
+        isOpen={isNewShipmentOpen}
+        onClose={() => setIsNewShipmentOpen(false)}
+        onCreateShipment={handleCreateShipment}
+      />
+
+      {/* Edit Shipment Modal */}
+      <EditShipmentModal
+        isOpen={!!editingShipment}
+        shipment={editingShipment}
+        onClose={() => setEditingShipment(null)}
+        onSave={async (updates) => {
+          if (editingShipment) {
+            await ShipmentService.updateShipment(editingShipment.id, updates);
+            await loadAllData();
+            setEditingShipment(null);
+          }
+        }}
       />
     </div>
   );
 };
+
