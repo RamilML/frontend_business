@@ -51,7 +51,8 @@ export class AuthService {
     const saved = localStorage.getItem(STORAGE_KEY_CONFIG);
     if (!saved) return DEFAULT_API_CONFIG;
     try {
-      return { ...DEFAULT_API_CONFIG, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved);
+      return { ...DEFAULT_API_CONFIG, ...parsed, useMock: false };
     } catch {
       return DEFAULT_API_CONFIG;
     }

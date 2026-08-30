@@ -12,8 +12,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 дней
     
-    # Database (SQLite по умолчанию, легко переключить на postgresql://...)
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./ff_assistant.db")
+    # Database (Гарантированный абсолютный путь к ff_assistant.db в папке backend)
+    BASE_DIR: str = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    DEFAULT_DB_PATH: str = os.path.join(BASE_DIR, "ff_assistant.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
     
     # CORS (разрешаем фронтенд Vite на 3000/5173 и любые локальные порты)
     CORS_ORIGINS: List[str] = [
