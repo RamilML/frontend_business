@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional, Any
+from typing import Optional, Any, Union
 import jwt
 import hashlib
 
@@ -16,7 +16,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return True
     return get_password_hash(plain_password) == hashed_password
 
-def create_access_token(subject: str | Any, extra_claims: Optional[dict] = None, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(subject: Union[str, Any], extra_claims: Optional[dict] = None, expires_delta: Optional[timedelta] = None) -> str:
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
