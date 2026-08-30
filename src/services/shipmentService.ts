@@ -167,7 +167,7 @@ export class ShipmentService {
         clientId: dto.clientId,
         clientName: dto.clientId,
         targetWarehouses: dto.targetWarehouses,
-        status: 'receiving',
+        status: 'draft',
         operatorId: user?.id,
         operatorName: user?.name,
         boxes: [],
@@ -311,6 +311,9 @@ export class ShipmentService {
       if (item) {
         item.scannedQuantity += 1;
         item.lastScannedAt = new Date().toISOString();
+        if (shipment.status === 'draft') {
+          shipment.status = 'receiving';
+        }
         shipment.updatedAt = new Date().toISOString();
         this.saveStoredShipments(list);
 
@@ -386,12 +389,15 @@ export class ShipmentService {
       const list = this.loadStoredShipments();
       const shipment = list.find((s) => s.id === shipmentId);
       if (shipment && data.item) {
+        if (shipment.status === 'draft') {
+          shipment.status = 'receiving';
+        }
         const localItem = shipment.items.find((it) => it.id === data.item.id || it.barcode === data.item.barcode);
         if (localItem) {
           localItem.scannedQuantity = data.item.scannedQuantity;
           localItem.lastScannedAt = data.item.lastScannedAt;
-          this.saveStoredShipments(list);
         }
+        this.saveStoredShipments(list);
       }
 
       audioSynth.playSuccessBeep();
@@ -486,6 +492,9 @@ export class ShipmentService {
           const list = this.loadStoredShipments();
           const shipment = list.find((s) => s.id === shipmentId);
           if (shipment) {
+            if (shipment.status === 'draft') {
+              shipment.status = 'receiving';
+            }
             shipment.items.unshift(item);
             this.saveStoredShipments(list);
           }
@@ -510,6 +519,9 @@ export class ShipmentService {
       lastScannedAt: new Date().toISOString()
     };
 
+    if (shipment.status === 'draft') {
+      shipment.status = 'receiving';
+    }
     shipment.items.unshift(createdItem);
     shipment.updatedAt = new Date().toISOString();
     this.saveStoredShipments(list);
@@ -779,6 +791,10 @@ export class ShipmentService {
         title: item.title,
         quantity
       });
+    }
+
+    if (shipment.status === 'draft' || shipment.status === 'receiving') {
+      shipment.status = 'packing';
     }
 
     shipment.updatedAt = new Date().toISOString();

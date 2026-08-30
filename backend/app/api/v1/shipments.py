@@ -125,7 +125,7 @@ def create_shipment(dto: ShipmentCreate = Body(...), db: Session = Depends(get_d
         client_id=dto.clientId,
         client_name=client_name,
         target_warehouses=dto.targetWarehouses,
-        status="receiving"
+        status="draft"
     )
     db.add(shipment)
     db.flush()
@@ -168,6 +168,8 @@ def process_barcode_scan(id: str, req: ScanRequest = Body(...), db: Session = De
     if item:
         item.scanned_quantity += 1
         item.last_scanned_at = datetime.utcnow()
+        if shipment.status == "draft":
+            shipment.status = "receiving"
         shipment.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(item)
@@ -310,6 +312,8 @@ def add_item_to_shipment(id: str, it: ShipmentItemBase = Body(...), db: Session 
         last_scanned_at=datetime.utcnow()
     )
     db.add(item_model)
+    if shipment.status == "draft":
+        shipment.status = "receiving"
     shipment.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(item_model)
@@ -391,6 +395,11 @@ def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest = Body(...), 
         })
 
     box.items = current_items
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if shipment:
+        if shipment.status in ["draft", "receiving"]:
+            shipment.status = "packing"
+        shipment.updated_at = datetime.utcnow()
     db.commit()
     
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
