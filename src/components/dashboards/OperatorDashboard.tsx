@@ -3,22 +3,24 @@ import { Shipment, CreateShipmentDto } from '../../types/shipment';
 import { ShipmentService } from '../../services/shipmentService';
 import { BarcodeScanScreen } from '../scanning/BarcodeScanScreen';
 import { NewShipmentModal } from '../scanning/NewShipmentModal';
+import { EditShipmentModal } from '../scanning/EditShipmentModal';
 import {
   PackageCheck,
   Barcode,
-  Box,
   Truck,
   PlusCircle,
   Play,
-  CheckCircle2,
   Building2,
-  Clock
+  Edit2,
+  Trash2
 } from 'lucide-react';
 
 export const OperatorDashboard: React.FC = () => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [activeShipmentId, setActiveShipmentId] = useState<string | null>(null);
   const [isNewShipmentOpen, setIsNewShipmentOpen] = useState(false);
+  const [editingShipment, setEditingShipment] = useState<Shipment | null>(null);
+  const [deletingShipment, setDeletingShipment] = useState<Shipment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadShipments = async () => {
@@ -43,6 +45,39 @@ export const OperatorDashboard: React.FC = () => {
     setActiveShipmentId(created.id);
   };
 
+  const handleSaveShipmentEdits = async (updates: Partial<Shipment>) => {
+    if (!editingShipment) return;
+    const sid = editingShipment.id;
+
+    // Optimistic UI update
+    setShipments((prev) =>
+      prev.map((s) => (s.id === sid ? { ...s, ...updates } : s))
+    );
+
+    try {
+      await ShipmentService.updateShipment(sid, updates);
+      loadShipments();
+    } catch (err) {
+      console.error('Update shipment error:', err);
+    }
+  };
+
+  const handleConfirmDeleteShipment = async () => {
+    if (!deletingShipment) return;
+    const sid = deletingShipment.id;
+
+    // Optimistic UI delete
+    setShipments((prev) => prev.filter((s) => s.id !== sid));
+    setDeletingShipment(null);
+
+    try {
+      await ShipmentService.deleteShipment(sid);
+      loadShipments();
+    } catch (err) {
+      console.error('Delete shipment error:', err);
+    }
+  };
+
   if (activeShipmentId) {
     return (
       <BarcodeScanScreen
@@ -54,6 +89,23 @@ export const OperatorDashboard: React.FC = () => {
       />
     );
   }
+
+  const getStatusBadge = (status: Shipment['status']) => {
+    switch (status) {
+      case 'receiving':
+        return <span className="badge badge-operator">🟡 В приёмке</span>;
+      case 'packing':
+        return <span className="badge badge-manager">📦 В упаковке</span>;
+      case 'ready_to_ship':
+        return <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981' }}>🟢 Готова к отгрузке</span>;
+      case 'shipped':
+        return <span className="badge badge-client">🚚 Отгружена</span>;
+      case 'completed':
+        return <span className="badge badge-admin">🏁 Завершена</span>;
+      default:
+        return <span className="badge badge-operator">{status}</span>;
+    }
+  };
 
   return (
     <div className="dashboard-container">
@@ -88,7 +140,7 @@ export const OperatorDashboard: React.FC = () => {
             Нет активных поставок. Нажмите «Новая поставка», чтобы начать приёмку.
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
             {shipments.map((shp) => {
               const totalPlanned = shp.items.reduce((acc, it) => acc + it.plannedQuantity, 0);
               const totalScanned = shp.items.reduce((acc, it) => acc + it.scannedQuantity, 0);
@@ -104,36 +156,75 @@ export const OperatorDashboard: React.FC = () => {
                     padding: '1.25rem',
                     display: 'flex',
                     flexDirection: 'column',
-                    justifyContent: 'space-between'
+                    justifyContent: 'space-between',
+                    gap: '1rem'
                   }}
                 >
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                      <span style={{ fontWeight: 700, fontSize: '1.1rem', color: 'var(--primary)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                      <span style={{ fontWeight: 700, fontSize: '1.15rem', color: 'var(--primary)', fontFamily: 'var(--font-mono)' }}>
                         {shp.shipmentNumber}
                       </span>
-                      <span className="badge badge-operator">
-                        {shp.status === 'receiving' ? 'В приёмке' : shp.status}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        {getStatusBadge(shp.status)}
+                        {/* Edit Shipment */}
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingShipment(shp);
+                          }}
+                          style={{ padding: '0.25rem 0.45rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+                          title="Редактировать поставку"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        {/* Delete Shipment */}
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingShipment(shp);
+                          }}
+                          style={{ padding: '0.25rem 0.45rem', color: '#f43f5e', borderColor: 'rgba(244, 63, 94, 0.4)' }}
+                          title="Удалить поставку"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
 
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.85rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Building2 size={14} /> Клиент: <b>{shp.clientName}</b>
+                        <Building2 size={14} /> Клиент: <b style={{ color: 'var(--text-main)' }}>{shp.clientName}</b>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
-                        <Truck size={14} /> Склады ВБ: {shp.targetWarehouses.join(', ')}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.25rem' }}>
+                        <Truck size={14} color="var(--primary)" /> Склады ВБ: <span style={{ color: 'var(--text-main)' }}>{shp.targetWarehouses.join(', ')}</span>
                       </div>
+                      {shp.operatorName && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>
+                          Оператор: {shp.operatorName}
+                        </div>
+                      )}
                     </div>
 
                     {/* Progress */}
-                    <div style={{ marginBottom: '1rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
-                        <span>Отсканировано:</span>
-                        <b>{totalScanned} / {totalPlanned} шт. ({percent}%)</b>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                        <span>Принято:</span>
+                        <b style={{ color: percent >= 100 ? '#10b981' : 'var(--primary)' }}>{totalScanned} / {totalPlanned} шт. ({percent}%)</b>
                       </div>
                       <div style={{ height: 6, background: 'rgba(255,255,255,0.1)', borderRadius: 999 }}>
-                        <div style={{ width: `${percent}%`, height: '100%', background: 'var(--primary)', borderRadius: 999 }} />
+                        <div
+                          style={{
+                            width: `${Math.min(100, percent)}%`,
+                            height: '100%',
+                            background: percent >= 100 ? '#10b981' : 'var(--primary)',
+                            borderRadius: 999
+                          }}
+                        />
                       </div>
                     </div>
                   </div>
@@ -158,6 +249,51 @@ export const OperatorDashboard: React.FC = () => {
         onClose={() => setIsNewShipmentOpen(false)}
         onCreateShipment={handleCreateShipment}
       />
+
+      {/* Edit Shipment Modal */}
+      <EditShipmentModal
+        isOpen={!!editingShipment}
+        shipment={editingShipment}
+        onClose={() => setEditingShipment(null)}
+        onSave={handleSaveShipmentEdits}
+      />
+
+      {/* Delete Shipment Confirmation Modal */}
+      {deletingShipment && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: 440 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem', color: '#f43f5e' }}>
+              <Trash2 size={24} />
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Удалить поставку?</h3>
+            </div>
+            
+            <p style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginTop: '0.5rem', marginBottom: '0.5rem' }}>
+              Вы уверены, что хотите удалить поставку <b>«{deletingShipment.shipmentNumber}»</b> (клиент: {deletingShipment.clientName})?
+            </p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.5rem' }}>
+              Все отсканированные товары ({deletingShipment.items.length} поз.) и сформированные коробки ({deletingShipment.boxes.length} шт.) будут безвозвратно удалены.
+            </p>
+
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setDeletingShipment(null)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleConfirmDeleteShipment}
+                style={{ background: '#f43f5e', borderColor: '#f43f5e', width: 'auto' }}
+              >
+                Да, удалить поставку
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

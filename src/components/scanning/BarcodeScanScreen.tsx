@@ -3,6 +3,7 @@ import { Shipment, ScanResult, ShipmentItem } from '../../types/shipment';
 import { ShipmentService } from '../../services/shipmentService';
 import { CameraScannerModal } from './CameraScannerModal';
 import { PackingScreen } from '../packing/PackingScreen';
+import { EditShipmentModal } from './EditShipmentModal';
 import {
   Barcode,
   CheckCircle2,
@@ -18,7 +19,8 @@ import {
   PackagePlus,
   Edit2,
   Trash2,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 
 interface Props {
@@ -34,6 +36,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const [flashType, setFlashType] = useState<'success' | 'error' | null>(null);
   const [isPackingView, setIsPackingView] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isEditShipmentOpen, setIsEditShipmentOpen] = useState(false);
   
   // Unlisted Barcode Modal state
   const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
@@ -299,6 +302,17 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
     }
   };
 
+  const handleSaveShipmentEdits = async (updates: Partial<Shipment>) => {
+    if (!shipment) return;
+    setShipment((prev) => (prev ? { ...prev, ...updates } : null));
+    try {
+      await ShipmentService.updateShipment(shipmentId, updates);
+      loadShipment(false);
+    } catch (err) {
+      console.error('Update shipment error:', err);
+    }
+  };
+
   if (isLoading || !shipment) {
     return (
       <div className="dashboard-container" style={{ textAlign: 'center', padding: '4rem' }}>
@@ -344,9 +358,20 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
               <ArrowLeft size={16} /> Назад
             </button>
             <div>
-              <h2 style={{ fontSize: '1.4rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Barcode color="var(--primary)" size={24} /> Поставка {shipment.shipmentNumber}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <h2 style={{ fontSize: '1.4rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Barcode color="var(--primary)" size={24} /> Поставка {shipment.shipmentNumber}
+                </h2>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setIsEditShipmentOpen(true)}
+                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+                  title="Изменить склады WB, статус или реквизиты поставки"
+                >
+                  <Edit2 size={12} /> Изменить
+                </button>
+              </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.75rem', marginTop: '0.1rem' }}>
                 <span>Клиент: <b>{shipment.clientName}</b></span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
@@ -824,6 +849,14 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
           </div>
         </div>
       )}
+
+      {/* Edit Shipment Modal */}
+      <EditShipmentModal
+        isOpen={isEditShipmentOpen}
+        shipment={shipment}
+        onClose={() => setIsEditShipmentOpen(false)}
+        onSave={handleSaveShipmentEdits}
+      />
 
       {/* Camera Video Stream Modal for Mobile */}
       <CameraScannerModal

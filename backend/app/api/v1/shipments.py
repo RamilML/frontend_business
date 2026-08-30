@@ -74,6 +74,45 @@ def get_shipment_by_id(id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
     return format_shipment_response(shipment)
 
+@router.put("/{id}", response_model=ShipmentResponse)
+def update_shipment(id: str, dto: ShipmentUpdate = Body(...), db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if dto.shipmentNumber is not None and dto.shipmentNumber.strip():
+        shipment.shipment_number = dto.shipmentNumber.strip()
+    if dto.clientId is not None and dto.clientId.strip():
+        shipment.client_id = dto.clientId.strip()
+        client = db.query(ClientModel).filter(ClientModel.id == shipment.client_id).first()
+        if client:
+            shipment.client_name = client.name
+    if dto.clientName is not None and dto.clientName.strip():
+        shipment.client_name = dto.clientName.strip()
+    if dto.targetWarehouses is not None:
+        shipment.target_warehouses = dto.targetWarehouses
+    if dto.status is not None and dto.status.strip():
+        shipment.status = dto.status.strip()
+    if dto.operatorId is not None:
+        shipment.operator_id = dto.operatorId
+    if dto.operatorName is not None:
+        shipment.operator_name = dto.operatorName
+
+    shipment.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(shipment)
+    return format_shipment_response(shipment)
+
+@router.delete("/{id}")
+def delete_shipment(id: str, db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    db.delete(shipment)
+    db.commit()
+    return {"success": True, "message": f"Поставка {shipment.shipment_number} успешно удалена"}
+
 @router.post("", response_model=ShipmentResponse, status_code=status.HTTP_201_CREATED)
 def create_shipment(dto: ShipmentCreate = Body(...), db: Session = Depends(get_db)):
     client = db.query(ClientModel).filter(ClientModel.id == dto.clientId).first()

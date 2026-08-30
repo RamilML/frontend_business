@@ -1,4 +1,23 @@
-export type WBWarehouse = 'Коледино' | 'Электросталь' | 'Тула' | 'Казань' | 'Невинномысск' | 'Екатеринбург' | 'Новосибирск' | 'СПб Уткина Заводь';
+export type WBWarehouse =
+  | 'Коледино'
+  | 'Электросталь'
+  | 'Тула'
+  | 'Казань'
+  | 'Невинномысск'
+  | 'Екатеринбург'
+  | 'Новосибирск'
+  | 'СПб Уткина Заводь';
+
+export const WB_WAREHOUSES: WBWarehouse[] = [
+  'Коледино',
+  'Электросталь',
+  'Тула',
+  'Казань',
+  'Невинномысск',
+  'Екатеринбург',
+  'Новосибирск',
+  'СПб Уткина Заводь'
+];
 
 export interface ShipmentItem {
   id: string;
@@ -25,7 +44,7 @@ export interface PackingBox {
   }[];
 }
 
-export type ShipmentStatus = 'draft' | 'receiving' | 'packing' | 'completed' | 'shipped';
+export type ShipmentStatus = 'draft' | 'receiving' | 'packing' | 'ready_to_ship' | 'completed' | 'shipped';
 
 export interface Shipment {
   id: string;

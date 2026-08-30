@@ -208,9 +208,82 @@ export class ShipmentService {
     }
   }
 
-  /**
-   * Ключевой метод обработки сканирования ШК
-   */
+  public static async updateShipment(
+    id: string,
+    updates: Partial<Shipment>
+  ): Promise<Shipment | null> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            shipmentNumber: updates.shipmentNumber,
+            clientId: updates.clientId,
+            clientName: updates.clientName,
+            targetWarehouses: updates.targetWarehouses,
+            status: updates.status,
+            operatorId: updates.operatorId,
+            operatorName: updates.operatorName
+          })
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          const list = this.loadStoredShipments();
+          const idx = list.findIndex((s) => s.id === id);
+          if (idx !== -1) {
+            list[idx] = { ...list[idx], ...updated };
+            this.saveStoredShipments(list);
+          }
+          return updated;
+        }
+      } catch (e) {
+        console.warn('Update shipment server call failed, using local:', e);
+      }
+    }
+
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === id);
+    if (!shipment) return null;
+
+    if (updates.shipmentNumber) shipment.shipmentNumber = updates.shipmentNumber;
+    if (updates.clientId) shipment.clientId = updates.clientId;
+    if (updates.clientName) shipment.clientName = updates.clientName;
+    if (updates.targetWarehouses) shipment.targetWarehouses = updates.targetWarehouses;
+    if (updates.status) shipment.status = updates.status;
+    if (updates.operatorName) shipment.operatorName = updates.operatorName;
+    shipment.updatedAt = new Date().toISOString();
+
+    this.saveStoredShipments(list);
+    return shipment;
+  }
+
+  public static async deleteShipment(id: string): Promise<boolean> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        await fetch(`${config.baseUrl}/shipments/${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+      } catch (e) {
+        console.warn('Delete shipment server call failed:', e);
+      }
+    }
+
+    const list = this.loadStoredShipments();
+    const filtered = list.filter((s) => s.id !== id);
+    this.saveStoredShipments(filtered);
+    return true;
+  }
   public static async processBarcodeScan(shipmentId: string, barcode: string): Promise<ScanResult> {
     const cleanBarcode = barcode.trim();
     if (!cleanBarcode) {
