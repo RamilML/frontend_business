@@ -299,8 +299,13 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
             <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Calculator size={18} color="var(--primary)" /> Перечень выполненных услуг (13 стандартных пунктов + кастом)
             </h3>
-            <button className="btn-secondary no-print" onClick={handleAddCustomService} style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem' }}>
-              <PlusCircle size={14} /> Добавить позицию
+            <button
+              type="button"
+              className="btn-primary no-print"
+              onClick={handleAddCustomService}
+              style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', width: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+            >
+              <PlusCircle size={14} /> + Добавить услугу
             </button>
           </div>
 
@@ -435,20 +440,6 @@ export const ActGeneratorScreen: React.FC<Props> = ({ shipment, actToEdit, onBac
                     </td>
                   </tr>
                 ))}
-
-                {/* Add Row Button at bottom */}
-                <tr className="no-print" style={{ background: 'rgba(15, 23, 42, 0.4)' }}>
-                  <td colSpan={6} style={{ padding: '0.6rem 1rem' }}>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={handleAddCustomService}
-                      style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-                    >
-                      <PlusCircle size={14} color="var(--primary)" /> Добавить произвольную услугу в Акт
-                    </button>
-                  </td>
-                </tr>
 
                 {/* TOTAL SUM ROW */}
                 <tr style={{ background: 'rgba(245, 158, 11, 0.1)', borderTop: '2px solid var(--primary)' }}>
