@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from typing import List
 from datetime import datetime
@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.models.shipment import ShipmentModel, ShipmentItemModel, PackingBoxModel
 from app.models.client import ClientModel
 from app.schemas.shipment import (
-    ShipmentCreate, ShipmentResponse, ShipmentItemResponse,
+    ShipmentCreate, ShipmentResponse, ShipmentItemResponse, ShipmentItemBase,
     ScanRequest, ScanResponse, UpdateItemQtyRequest,
     CreateBoxRequest, UpdateBoxWarehouseRequest, PackItemRequest, MoveItemRequest,
     PackingBoxSchema, BoxItemSchema
@@ -75,7 +75,7 @@ def get_shipment_by_id(id: str, db: Session = Depends(get_db)):
     return format_shipment_response(shipment)
 
 @router.post("", response_model=ShipmentResponse, status_code=status.HTTP_201_CREATED)
-def create_shipment(dto: ShipmentCreate, db: Session = Depends(get_db)):
+def create_shipment(dto: ShipmentCreate = Body(...), db: Session = Depends(get_db)):
     client = db.query(ClientModel).filter(ClientModel.id == dto.clientId).first()
     client_name = client.name if client else dto.clientId
 
@@ -100,7 +100,7 @@ def create_shipment(dto: ShipmentCreate, db: Session = Depends(get_db)):
                 article=it.article,
                 size=it.size,
                 brand=it.brand,
-                planned_quantity=it.plannedQuantity,
+                planned_quantity=it.plannedQuantity or 1,
                 scanned_quantity=0
             )
             db.add(item_model)
@@ -110,7 +110,7 @@ def create_shipment(dto: ShipmentCreate, db: Session = Depends(get_db)):
     return format_shipment_response(shipment)
 
 @router.post("/{id}/scan", response_model=ScanResponse)
-def process_barcode_scan(id: str, req: ScanRequest, db: Session = Depends(get_db)):
+def process_barcode_scan(id: str, req: ScanRequest = Body(...), db: Session = Depends(get_db)):
     barcode = req.barcode.strip()
     if not barcode:
         return ScanResponse(success=False, message="Пустой штрихкод")
@@ -158,7 +158,7 @@ def process_barcode_scan(id: str, req: ScanRequest, db: Session = Depends(get_db
         )
 
 @router.put("/{id}/items/{itemId}")
-def update_item_quantity(id: str, itemId: str, req: UpdateItemQtyRequest, db: Session = Depends(get_db)):
+def update_item_quantity(id: str, itemId: str, req: UpdateItemQtyRequest = Body(...), db: Session = Depends(get_db)):
     item = db.query(ShipmentItemModel).filter(
         ShipmentItemModel.shipment_id == id,
         ShipmentItemModel.id == itemId
@@ -172,7 +172,7 @@ def update_item_quantity(id: str, itemId: str, req: UpdateItemQtyRequest, db: Se
     return {"success": True, "scannedQuantity": item.scanned_quantity}
 
 @router.post("/{id}/items", response_model=ShipmentItemResponse, status_code=status.HTTP_201_CREATED)
-def add_item_to_shipment(id: str, it: ShipmentItemBase, db: Session = Depends(get_db)):
+def add_item_to_shipment(id: str, it: ShipmentItemBase = Body(...), db: Session = Depends(get_db)):
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
@@ -215,7 +215,7 @@ def add_item_to_shipment(id: str, it: ShipmentItemBase, db: Session = Depends(ge
     )
 
 @router.post("/{id}/boxes")
-def create_box(id: str, req: CreateBoxRequest, db: Session = Depends(get_db)):
+def create_box(id: str, req: CreateBoxRequest = Body(...), db: Session = Depends(get_db)):
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
@@ -233,7 +233,7 @@ def create_box(id: str, req: CreateBoxRequest, db: Session = Depends(get_db)):
     return format_shipment_response(shipment)
 
 @router.put("/{id}/boxes/{boxNumber}/warehouse")
-def update_box_warehouse(id: str, boxNumber: int, req: UpdateBoxWarehouseRequest, db: Session = Depends(get_db)):
+def update_box_warehouse(id: str, boxNumber: int, req: UpdateBoxWarehouseRequest = Body(...), db: Session = Depends(get_db)):
     box = db.query(PackingBoxModel).filter(
         PackingBoxModel.shipment_id == id,
         PackingBoxModel.box_number == boxNumber
@@ -246,7 +246,7 @@ def update_box_warehouse(id: str, boxNumber: int, req: UpdateBoxWarehouseRequest
     return {"success": True, "boxNumber": boxNumber, "targetWarehouse": box.target_warehouse}
 
 @router.post("/{id}/boxes/{boxNumber}/pack")
-def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest, db: Session = Depends(get_db)):
+def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest = Body(...), db: Session = Depends(get_db)):
     box = db.query(PackingBoxModel).filter(
         PackingBoxModel.shipment_id == id,
         PackingBoxModel.box_number == boxNumber
@@ -283,7 +283,7 @@ def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest, db: Session 
     return format_shipment_response(shipment)
 
 @router.post("/{id}/boxes/move")
-def move_items_between_boxes(id: str, req: MoveItemRequest, db: Session = Depends(get_db)):
+def move_items_between_boxes(id: str, req: MoveItemRequest = Body(...), db: Session = Depends(get_db)):
     from_box = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id, PackingBoxModel.box_number == req.fromBoxNumber).first()
     to_box = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id, PackingBoxModel.box_number == req.toBoxNumber).first()
     if not from_box or not to_box:

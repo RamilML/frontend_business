@@ -344,7 +344,7 @@ export class ShipmentService {
             barcode: newItem.barcode,
             sku: newItem.sku || `SKU-${newItem.barcode}`,
             title: newItem.title,
-            plannedQuantity: newItem.plannedQuantity || 10
+            plannedQuantity: newItem.plannedQuantity || 1
           })
         });
         if (res.ok) {
@@ -372,7 +372,7 @@ export class ShipmentService {
       barcode: newItem.barcode,
       sku: newItem.sku || `SKU-${newItem.barcode}`,
       title: newItem.title,
-      plannedQuantity: newItem.plannedQuantity || 10,
+      plannedQuantity: newItem.plannedQuantity || 1,
       scannedQuantity: 1,
       lastScannedAt: new Date().toISOString()
     };
