@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Shipment, ScanResult } from '../../types/shipment';
+import { Shipment, ScanResult, ShipmentItem } from '../../types/shipment';
 import { ShipmentService } from '../../services/shipmentService';
 import { CameraScannerModal } from './CameraScannerModal';
 import { PackingScreen } from '../packing/PackingScreen';
@@ -15,7 +15,8 @@ import {
   Layers,
   Camera,
   PlusCircle,
-  HelpCircle
+  HelpCircle,
+  PackagePlus
 } from 'lucide-react';
 
 interface Props {
@@ -31,8 +32,12 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const [flashType, setFlashType] = useState<'success' | 'error' | null>(null);
   const [isPackingView, setIsPackingView] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  
+  // Unlisted Barcode Modal state
   const [unknownBarcode, setUnknownBarcode] = useState<string | null>(null);
   const [newItemTitle, setNewItemTitle] = useState('');
+  const [newItemSku, setNewItemSku] = useState('');
+  const [newItemPlannedQty, setNewItemPlannedQty] = useState<number>(10);
 
   // TSD Keyboard Buffer Listener
   const keyBufferRef = useRef<string>('');
@@ -118,6 +123,9 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
       triggerFlash('error');
       if (res.isNewItem) {
         setUnknownBarcode(cleanCode);
+        setNewItemTitle('');
+        setNewItemSku(`SKU-${cleanCode}`);
+        setNewItemPlannedQty(10);
       }
     }
   };
@@ -133,14 +141,46 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const handleAddNewUnlistedItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (unknownBarcode && newItemTitle.trim()) {
-      await ShipmentService.addItemToShipment(shipmentId, {
-        barcode: unknownBarcode,
-        title: newItemTitle.trim(),
-        plannedQuantity: 10
-      });
+      const barcodeToAdd = unknownBarcode;
+      const titleToAdd = newItemTitle.trim();
+      const plannedToAdd = Number(newItemPlannedQty) || 10;
+      const skuToAdd = newItemSku.trim() || `SKU-${barcodeToAdd}`;
+
       setUnknownBarcode(null);
       setNewItemTitle('');
-      loadShipment(false);
+      setNewItemSku('');
+
+      try {
+        const createdItem = await ShipmentService.addItemToShipment(shipmentId, {
+          barcode: barcodeToAdd,
+          title: titleToAdd,
+          plannedQuantity: plannedToAdd,
+          sku: skuToAdd
+        });
+
+        // Optimistically insert new item into state immediately
+        setShipment((prev) => {
+          if (!prev) return prev;
+          if (prev.items.some((it) => it.barcode === createdItem.barcode)) {
+            return prev;
+          }
+          return {
+            ...prev,
+            items: [createdItem, ...prev.items]
+          };
+        });
+
+        setLastScanResult({
+          success: true,
+          item: createdItem,
+          message: `Новый товар добавлен и принят: ${createdItem.title} (1/${createdItem.plannedQuantity} шт.)`
+        });
+        triggerFlash('success');
+
+        loadShipment(false);
+      } catch (err) {
+        console.error('Failed to add item:', err);
+      }
     }
   };
 
@@ -429,17 +469,19 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
       {/* Unlisted Barcode Modal: When an unexpected item is scanned */}
       {unknownBarcode && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: 450 }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f59e0b' }}>
-              <HelpCircle size={22} /> Неизвестный штрихкод в поставке
-            </h3>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Штрихкод <b style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary)' }}>{unknownBarcode}</b> не был запланирован для этой поставки. Вы хотите добавить его прямо сейчас?
+          <div className="modal-content" style={{ maxWidth: 480 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem', color: '#f59e0b' }}>
+              <PackagePlus size={24} />
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>Неизвестный штрихкод в поставке</h3>
+            </div>
+            
+            <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              Штрихкод <b style={{ fontFamily: 'var(--font-mono)', color: 'var(--primary)', background: 'rgba(255,255,255,0.08)', padding: '0.2rem 0.4rem', borderRadius: 4 }}>{unknownBarcode}</b> не найден в плане этой поставки. Введите название, чтобы принять его:
             </p>
 
             <form onSubmit={handleAddNewUnlistedItem}>
               <div className="form-group">
-                <label className="form-label">Наименование товара</label>
+                <label className="form-label">Наименование товара *</label>
                 <input
                   type="text"
                   className="form-input"
@@ -451,7 +493,32 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-group">
+                  <label className="form-label">Артикул / SKU</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={newItemSku}
+                    onChange={(e) => setNewItemSku(e.target.value)}
+                    placeholder="Например: DRESS-BEG-42"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">План (шт.)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    className="form-input"
+                    value={newItemPlannedQty}
+                    onChange={(e) => setNewItemPlannedQty(Number(e.target.value))}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem', justifyContent: 'flex-end' }}>
                 <button
                   type="button"
                   className="btn-secondary"
@@ -459,8 +526,8 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                 >
                   Отмена
                 </button>
-                <button type="submit" className="btn-primary">
-                  <PlusCircle size={16} /> Принять товар в поставку
+                <button type="submit" className="btn-primary" style={{ width: 'auto' }}>
+                  <PlusCircle size={16} /> Добавить и принять 1 шт.
                 </button>
               </div>
             </form>

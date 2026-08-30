@@ -350,6 +350,12 @@ export class ShipmentService {
         if (res.ok) {
           const item = await res.json();
           audioSynth.playSuccessBeep();
+          const list = this.loadStoredShipments();
+          const shipment = list.find((s) => s.id === shipmentId);
+          if (shipment) {
+            shipment.items.unshift(item);
+            this.saveStoredShipments(list);
+          }
           return item;
         }
       } catch (e) {
