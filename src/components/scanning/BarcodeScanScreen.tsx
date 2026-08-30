@@ -189,7 +189,11 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
         });
         triggerFlash('success');
 
-        loadShipment(false);
+        // Background sync to ensure fresh state from server
+        const fresh = await ShipmentService.getShipmentById(shipmentId);
+        if (fresh) {
+          setShipment(fresh);
+        }
       } catch (err) {
         console.error('Failed to add item:', err);
       }
@@ -254,7 +258,10 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
 
     try {
       await ShipmentService.editShipmentItem(shipmentId, itemId, updates);
-      loadShipment(false);
+      const fresh = await ShipmentService.getShipmentById(shipmentId);
+      if (fresh) {
+        setShipment(fresh);
+      }
     } catch (err) {
       console.error('Failed to edit item:', err);
     }
@@ -265,7 +272,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
     if (!deletingItem) return;
     const itemId = deletingItem.id;
 
-    // Optimistic delete in UI
+    // 1. Optimistic delete in UI immediately
     setShipment((prev) => {
       if (!prev) return prev;
       return {
@@ -280,9 +287,13 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
 
     setDeletingItem(null);
 
+    // 2. Persist deletion on backend
     try {
       await ShipmentService.deleteShipmentItem(shipmentId, itemId);
-      loadShipment(false);
+      const fresh = await ShipmentService.getShipmentById(shipmentId);
+      if (fresh) {
+        setShipment(fresh);
+      }
     } catch (err) {
       console.error('Failed to delete item:', err);
     }
@@ -620,15 +631,32 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">План (шт.)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-input"
-                    value={newItemPlannedQty}
-                    onChange={(e) => setNewItemPlannedQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    required
-                  />
+                  <label className="form-label">План (шт.) *</label>
+                  <div className="number-stepper">
+                    <button
+                      type="button"
+                      className="number-stepper-btn"
+                      onClick={() => setNewItemPlannedQty((q) => Math.max(1, q - 1))}
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      className="form-input form-input-number"
+                      style={{ textAlign: 'center', padding: '0.4rem 0.5rem', background: 'transparent', border: 'none' }}
+                      value={newItemPlannedQty}
+                      onChange={(e) => setNewItemPlannedQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="number-stepper-btn"
+                      onClick={() => setNewItemPlannedQty((q) => q + 1)}
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -715,14 +743,31 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
 
                 <div className="form-group">
                   <label className="form-label">План (шт.) *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    className="form-input"
-                    value={editPlannedQty}
-                    onChange={(e) => setEditPlannedQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                    required
-                  />
+                  <div className="number-stepper">
+                    <button
+                      type="button"
+                      className="number-stepper-btn"
+                      onClick={() => setEditPlannedQty((q) => Math.max(1, q - 1))}
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      className="form-input form-input-number"
+                      style={{ textAlign: 'center', padding: '0.4rem 0.5rem', background: 'transparent', border: 'none' }}
+                      value={editPlannedQty}
+                      onChange={(e) => setEditPlannedQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      required
+                    />
+                    <button
+                      type="button"
+                      className="number-stepper-btn"
+                      onClick={() => setEditPlannedQty((q) => q + 1)}
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
