@@ -813,8 +813,9 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                     {activeBox.items.map((item, idx) => {
                       // Calculate available units left for this specific item
                       const parentItem = shipment.items.find((it) => it.id === item.itemId || it.barcode === item.barcode);
+                      const targetItemId = item.itemId || (parentItem ? parentItem.id : item.barcode);
                       const totalPackedAcrossBoxes = shipment.boxes.reduce((acc, b) => {
-                        const found = b.items.find((bi) => bi.itemId === item.itemId || bi.barcode === item.barcode);
+                        const found = b.items.find((bi) => bi.itemId === targetItemId || bi.barcode === item.barcode || (parentItem && bi.itemId === parentItem.id));
                         return acc + (found ? found.quantity : 0);
                       }, 0);
                       const totalScannedForThisItem = parentItem?.scannedQuantity || 0;
@@ -831,7 +832,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                                 <button
                                   type="button"
                                   className="btn-secondary"
-                                  onClick={() => handleUpdateBoxItemQuantity(activeBox.boxNumber, item.itemId, item.quantity - 1)}
+                                  onClick={() => handleUpdateBoxItemQuantity(activeBox.boxNumber, targetItemId, item.quantity - 1)}
                                   style={{ padding: '0.2rem 0.45rem', fontSize: '0.75rem', height: 26, minWidth: 26, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                   title="Уменьшить на 1 шт."
                                 >
@@ -846,7 +847,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                                 <button
                                   type="button"
                                   className="btn-secondary"
-                                  onClick={() => handleUpdateBoxItemQuantity(activeBox.boxNumber, item.itemId, item.quantity + 1)}
+                                  onClick={() => handleUpdateBoxItemQuantity(activeBox.boxNumber, targetItemId, item.quantity + 1)}
                                   disabled={freeUnpackedForThisItem <= 0}
                                   style={{
                                     padding: '0.2rem 0.45rem',
@@ -867,7 +868,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                                 <button
                                   type="button"
                                   className="btn-secondary"
-                                  onClick={() => handleRemoveItemFromBox(activeBox.boxNumber, item.itemId)}
+                                  onClick={() => handleRemoveItemFromBox(activeBox.boxNumber, targetItemId)}
                                   style={{
                                     padding: '0.2rem 0.45rem',
                                     fontSize: '0.75rem',

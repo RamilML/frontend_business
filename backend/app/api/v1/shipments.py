@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from typing import List
 from datetime import datetime
 
@@ -480,6 +481,7 @@ def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest = Body(...), 
         })
 
     box.items = current_items
+    flag_modified(box, "items")
     if shipment.status in ["draft", "receiving", "ready_to_ship"]:
         shipment.status = "packing"
     shipment.updated_at = datetime.utcnow()
@@ -496,6 +498,7 @@ def update_box_item_quantity(
     req: UpdateBoxItemQuantityRequest = Body(...),
     db: Session = Depends(get_db)
 ):
+    from sqlalchemy.orm.attributes import flag_modified
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
@@ -515,7 +518,7 @@ def update_box_item_quantity(
 
     item = db.query(ShipmentItemModel).filter(
         ShipmentItemModel.shipment_id == id,
-        ShipmentItemModel.id == itemId
+        (ShipmentItemModel.id == itemId) | (ShipmentItemModel.barcode == itemId)
     ).first()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Товар не найден")
@@ -526,7 +529,7 @@ def update_box_item_quantity(
     for b in all_boxes:
         if b.box_number != boxNumber:
             for bi in (b.items or []):
-                if bi.get("itemId") == itemId:
+                if bi.get("itemId") == item.id or bi.get("barcode") == item.barcode or bi.get("itemId") == itemId:
                     packed_in_other_boxes += bi.get("quantity", 0)
 
     max_allowed_in_this_box = max(0, item.scanned_quantity - packed_in_other_boxes)
@@ -538,12 +541,18 @@ def update_box_item_quantity(
 
     current_items = list(box.items or [])
     if req.quantity <= 0:
-        current_items = [bi for bi in current_items if bi.get("itemId") != itemId]
+        current_items = [
+            bi for bi in current_items
+            if bi.get("itemId") != item.id and bi.get("barcode") != item.barcode and bi.get("itemId") != itemId
+        ]
     else:
         found = False
         for bi in current_items:
-            if bi.get("itemId") == itemId:
+            if bi.get("itemId") == item.id or bi.get("barcode") == item.barcode or bi.get("itemId") == itemId:
                 bi["quantity"] = req.quantity
+                bi["itemId"] = item.id
+                bi["barcode"] = item.barcode
+                bi["title"] = item.title
                 found = True
                 break
         if not found:
@@ -555,6 +564,7 @@ def update_box_item_quantity(
             })
 
     box.items = current_items
+    flag_modified(box, "items")
     if shipment.status in ["draft", "receiving", "ready_to_ship"]:
         shipment.status = "packing"
     shipment.updated_at = datetime.utcnow()
@@ -570,6 +580,7 @@ def remove_item_from_box(
     itemId: str,
     db: Session = Depends(get_db)
 ):
+    from sqlalchemy.orm.attributes import flag_modified
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
@@ -587,7 +598,16 @@ def remove_item_from_box(
     if box.is_packed:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Коробка запечатана. Вскройте её для изменения состава.")
 
-    box.items = [bi for bi in (box.items or []) if bi.get("itemId") != itemId]
+    item = db.query(ShipmentItemModel).filter(
+        ShipmentItemModel.shipment_id == id,
+        (ShipmentItemModel.id == itemId) | (ShipmentItemModel.barcode == itemId)
+    ).first()
+
+    box.items = [
+        bi for bi in (box.items or [])
+        if bi.get("itemId") != itemId and (not item or (bi.get("itemId") != item.id and bi.get("barcode") != item.barcode))
+    ]
+    flag_modified(box, "items")
     if shipment.status in ["draft", "receiving", "ready_to_ship"]:
         shipment.status = "packing"
     shipment.updated_at = datetime.utcnow()
@@ -598,6 +618,7 @@ def remove_item_from_box(
 
 @router.post("/{id}/boxes/move")
 def move_items_between_boxes(id: str, req: MoveItemRequest = Body(...), db: Session = Depends(get_db)):
+    from sqlalchemy.orm.attributes import flag_modified
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
