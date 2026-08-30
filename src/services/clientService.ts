@@ -111,36 +111,49 @@ export class ClientService {
   public static async getClients(searchQuery?: string): Promise<Client[]> {
     const config = AuthService.getConfig();
 
-    if (config.useMock) {
-      let list = this.loadStoredClients();
-      if (searchQuery && searchQuery.trim()) {
-        const q = searchQuery.toLowerCase().trim();
-        list = list.filter(
-          (c) =>
-            c.name.toLowerCase().includes(q) ||
-            c.requisites.inn.includes(q) ||
-            c.requisites.shortName.toLowerCase().includes(q) ||
-            c.contact.contactPerson.toLowerCase().includes(q)
-        );
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const url = new URL(`${config.baseUrl}/clients`);
+        if (searchQuery) url.searchParams.append('q', searchQuery);
+
+        const res = await fetch(url.toString(), {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const items: Client[] = data.items || data.clients || (Array.isArray(data) ? data : []);
+          if (items && items.length > 0) {
+            this.saveStoredClients(items);
+            return items;
+          }
+        }
+      } catch (e) {
+        console.warn('Get clients server call failed, using local fallback:', e);
       }
-      return list;
     }
 
-    // Real API implementation
-    const token = AuthService.getStoredToken();
-    const url = new URL(`${config.baseUrl}/clients`);
-    if (searchQuery) url.searchParams.append('q', searchQuery);
+    let list = this.loadStoredClients();
+    if (!list || list.length === 0) {
+      list = INITIAL_MOCK_CLIENTS;
+      this.saveStoredClients(list);
+    }
 
-    const res = await fetch(url.toString(), {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      }
-    });
-
-    if (!res.ok) throw new Error('Не удалось загрузить список клиентов с сервера');
-    const data = await res.json();
-    return data.items || data.clients || data;
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (c) =>
+          c.name.toLowerCase().includes(q) ||
+          c.requisites.inn.includes(q) ||
+          c.requisites.shortName.toLowerCase().includes(q) ||
+          c.contact.contactPerson.toLowerCase().includes(q)
+      );
+    }
+    return list;
   }
 
   public static async createClient(dto: CreateClientDto): Promise<Client> {

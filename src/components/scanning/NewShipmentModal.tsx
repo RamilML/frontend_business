@@ -130,9 +130,12 @@ export const NewShipmentModal: React.FC<Props> = ({ isOpen, onClose, onCreateShi
                 onChange={(e) => setSelectedClientId(e.target.value)}
                 required
               >
+                {clients.length === 0 && (
+                  <option value="">Загрузка списка клиентов...</option>
+                )}
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
-                    {client.name} (ИНН: {client.requisites.inn})
+                    {client.name} {client.requisites?.inn ? `(ИНН: ${client.requisites.inn})` : ''}
                   </option>
                 ))}
               </select>
