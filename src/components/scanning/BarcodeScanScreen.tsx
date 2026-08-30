@@ -21,7 +21,8 @@ import {
   Trash2,
   X,
   Settings,
-  Sparkles
+  Sparkles,
+  Lock
 } from 'lucide-react';
 
 interface Props {
@@ -83,6 +84,10 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
 
   // Global Hardware TSD Scanner key listener
   useEffect(() => {
+    if (!shipment || shipment.status === 'shipped' || shipment.status === 'completed') {
+      return;
+    }
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
@@ -371,6 +376,7 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
   const totalPlanned = shipment.items.reduce((acc, it) => acc + it.plannedQuantity, 0);
   const totalScanned = shipment.items.reduce((acc, it) => acc + it.scannedQuantity, 0);
   const progressPercent = totalPlanned > 0 ? Math.min(100, Math.round((totalScanned / totalPlanned) * 100)) : 0;
+  const isReadOnly = shipment.status === 'shipped' || shipment.status === 'completed';
 
   // Flash background overlay
   const flashBg =
@@ -395,15 +401,21 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                 <h2 style={{ fontSize: '1.4rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Barcode color="var(--primary)" size={24} /> Поставка {shipment.shipmentNumber}
                 </h2>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setIsEditShipmentOpen(true)}
-                  style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
-                  title="Изменить склады WB, статус или реквизиты поставки"
-                >
-                  <Edit2 size={12} /> Изменить
-                </button>
+                {!isReadOnly ? (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setIsEditShipmentOpen(true)}
+                    style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+                    title="Изменить склады WB, статус или реквизиты поставки"
+                  >
+                    <Edit2 size={12} /> Изменить
+                  </button>
+                ) : (
+                  <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', fontSize: '0.75rem' }}>
+                    {shipment.status === 'completed' ? '🏁 Завершена' : '🚚 Отгружена (Архив)'}
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.75rem', marginTop: '0.1rem' }}>
                 <span>Клиент: <b>{shipment.clientName}</b></span>
@@ -423,12 +435,14 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
               <Box size={16} /> Упаковка в Коробки ({shipment.boxes.length})
             </button>
 
-            <button
-              className="btn-secondary"
-              onClick={() => setIsCameraOpen(true)}
-            >
-              <Camera size={16} /> Камера Смартфона
-            </button>
+            {!isReadOnly && (
+              <button
+                className="btn-secondary"
+                onClick={() => setIsCameraOpen(true)}
+              >
+                <Camera size={16} /> Камера Смартфона
+              </button>
+            )}
           </div>
         </div>
 
@@ -454,31 +468,40 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
           </div>
         </div>
 
-        {/* Primary Barcode Input Controls */}
-        <div className="card" style={{ marginBottom: '1.25rem' }}>
-          <form onSubmit={handleManualScanSubmit} style={{ display: 'flex', gap: '0.75rem' }}>
-            <div className="input-with-icon" style={{ flex: 1 }}>
-              <Barcode className="input-icon" size={20} color="var(--primary)" />
-              <input
-                type="text"
-                className="form-input"
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                placeholder="Отсканируйте ШК сканером ТСД или введите вручную..."
-                style={{ fontSize: '1.05rem', fontFamily: 'var(--font-mono)' }}
-                autoFocus
-              />
+        {/* Primary Barcode Input Controls or ReadOnly Banner */}
+        {isReadOnly ? (
+          <div className="card" style={{ marginBottom: '1.25rem', padding: '1rem 1.25rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#93c5fd', fontSize: '0.92rem', fontWeight: 600 }}>
+              <Lock size={18} color="#38bdf8" />
+              <span>Поставка {shipment.status === 'completed' ? 'завершена' : 'отгружена водителю'}. Приёмка и сканирование товаров заблокированы (режим архива / только для чтения).</span>
             </div>
-            <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '0 1.5rem' }}>
-              <CheckCircle2 size={18} /> Принять ШК
-            </button>
-          </form>
-
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
-            <span>Сканер ТСД активен в фоновом режиме (нажимать на поле не обязательно)</span>
           </div>
-        </div>
+        ) : (
+          <div className="card" style={{ marginBottom: '1.25rem' }}>
+            <form onSubmit={handleManualScanSubmit} style={{ display: 'flex', gap: '0.75rem' }}>
+              <div className="input-with-icon" style={{ flex: 1 }}>
+                <Barcode className="input-icon" size={20} color="var(--primary)" />
+                <input
+                  type="text"
+                  className="form-input"
+                  value={barcodeInput}
+                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  placeholder="Отсканируйте ШК сканером ТСД или введите вручную..."
+                  style={{ fontSize: '1.05rem', fontFamily: 'var(--font-mono)' }}
+                  autoFocus
+                />
+              </div>
+              <button type="submit" className="btn-primary" style={{ width: 'auto', padding: '0 1.5rem' }}>
+                <CheckCircle2 size={18} /> Принять ШК
+              </button>
+            </form>
+
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.6rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} />
+              <span>Сканер ТСД активен в фоновом режиме (нажимать на поле не обязательно)</span>
+            </div>
+          </div>
+        )}
 
         {/* Spotlight Card: Last Scanned Item Feedback */}
         {lastScanResult && (
@@ -530,7 +553,9 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                   <th style={{ padding: '0.85rem 1rem' }}>Штрихкод / SKU</th>
                   <th style={{ padding: '0.85rem 1rem' }}>План</th>
                   <th style={{ padding: '0.85rem 1rem' }}>Отсканировано (Факт)</th>
-                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'right' }}>Корректировка & Действия</th>
+                  <th style={{ padding: '0.85rem 1.25rem', textAlign: 'right' }}>
+                    {isReadOnly ? 'Статус позиции' : 'Корректировка & Действия'}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -554,7 +579,16 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                       </td>
 
                       <td style={{ padding: '0.85rem 1rem', fontFamily: 'var(--font-mono)' }}>
-                        <div style={{ cursor: 'pointer', textDecoration: 'underline' }} onClick={() => executeBarcodeScan(item.barcode)} title="Нажмите для быстрой имитации сканирования">
+                        <div
+                          style={{
+                            cursor: isReadOnly ? 'default' : 'pointer',
+                            textDecoration: isReadOnly ? 'none' : 'underline'
+                          }}
+                          onClick={() => {
+                            if (!isReadOnly) executeBarcodeScan(item.barcode);
+                          }}
+                          title={isReadOnly ? 'Поставка отгружена' : 'Нажмите для быстрой имитации сканирования'}
+                        >
                           {item.barcode}
                         </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>{item.sku}</div>
@@ -577,67 +611,73 @@ export const BarcodeScanScreen: React.FC<Props> = ({ shipmentId, onBack }) => {
                       </td>
 
                       <td style={{ padding: '0.85rem 1.25rem', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                          {/* Minus Button */}
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleUpdateQuantity(item.id, -1);
-                            }}
-                            style={{ padding: '0.35rem 0.55rem', cursor: 'pointer' }}
-                            title="Уменьшить количество (-1)"
-                          >
-                            <Minus size={14} />
-                          </button>
+                        {isReadOnly ? (
+                          <div style={{ display: 'flex', gap: '0.35rem', justifyContent: 'flex-end', alignItems: 'center', color: '#10b981', fontSize: '0.82rem', fontWeight: 600 }}>
+                            <CheckCircle2 size={15} /> <span>Зафиксировано</span>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            {/* Minus Button */}
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleUpdateQuantity(item.id, -1);
+                              }}
+                              style={{ padding: '0.35rem 0.55rem', cursor: 'pointer' }}
+                              title="Уменьшить количество (-1)"
+                            >
+                              <Minus size={14} />
+                            </button>
 
-                          {/* Plus Button */}
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleUpdateQuantity(item.id, 1);
-                            }}
-                            style={{ padding: '0.35rem 0.55rem', borderColor: 'var(--primary)', cursor: 'pointer' }}
-                            title="Добавить количество (+1)"
-                          >
-                            <Plus size={14} />
-                          </button>
+                            {/* Plus Button */}
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleUpdateQuantity(item.id, 1);
+                              }}
+                              style={{ padding: '0.35rem 0.55rem', borderColor: 'var(--primary)', cursor: 'pointer' }}
+                              title="Добавить количество (+1)"
+                            >
+                              <Plus size={14} />
+                            </button>
 
-                          {/* Edit Details Button */}
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleOpenEditModal(item);
-                            }}
-                            style={{ padding: '0.35rem 0.55rem', color: '#38bdf8', borderColor: '#38bdf8' }}
-                            title="Редактировать название, артикул или план"
-                          >
-                            <Edit2 size={13} />
-                          </button>
+                            {/* Edit Details Button */}
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleOpenEditModal(item);
+                              }}
+                              style={{ padding: '0.35rem 0.55rem', color: '#38bdf8', borderColor: '#38bdf8' }}
+                              title="Редактировать название, артикул или план"
+                            >
+                              <Edit2 size={13} />
+                            </button>
 
-                          {/* Delete Item Button */}
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setDeletingItem(item);
-                            }}
-                            style={{ padding: '0.35rem 0.55rem', color: '#f43f5e', borderColor: '#f43f5e' }}
-                            title="Удалить товар из поставки"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
+                            {/* Delete Item Button */}
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setDeletingItem(item);
+                              }}
+                              style={{ padding: '0.35rem 0.55rem', color: '#f43f5e', borderColor: '#f43f5e' }}
+                              title="Удалить товар из поставки"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );

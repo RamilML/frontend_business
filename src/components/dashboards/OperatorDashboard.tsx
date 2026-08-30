@@ -14,7 +14,8 @@ import {
   Edit2,
   Trash2,
   Box,
-  CheckCircle2
+  CheckCircle2,
+  Lock
 } from 'lucide-react';
 
 export const OperatorDashboard: React.FC = () => {
@@ -182,32 +183,36 @@ export const OperatorDashboard: React.FC = () => {
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         {getStatusBadge(shp.status)}
-                        {/* Edit Shipment */}
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingShipment(shp);
-                          }}
-                          style={{ padding: '0.25rem 0.45rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
-                          title="Редактировать поставку"
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        {/* Delete Shipment */}
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeletingShipment(shp);
-                          }}
-                          style={{ padding: '0.25rem 0.45rem', color: '#f43f5e', borderColor: 'rgba(244, 63, 94, 0.4)' }}
-                          title="Удалить поставку"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                        {/* Edit Shipment - only for active */}
+                        {shp.status !== 'shipped' && shp.status !== 'completed' && (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingShipment(shp);
+                            }}
+                            style={{ padding: '0.25rem 0.45rem', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+                            title="Редактировать поставку"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                        )}
+                        {/* Delete Shipment - only for active */}
+                        {shp.status !== 'shipped' && shp.status !== 'completed' && (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingShipment(shp);
+                            }}
+                            style={{ padding: '0.25rem 0.45rem', color: '#f43f5e', borderColor: 'rgba(244, 63, 94, 0.4)' }}
+                            title="Удалить поставку"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -276,15 +281,15 @@ export const OperatorDashboard: React.FC = () => {
                           <Box size={14} /> Открыть коробки / Сканер
                         </button>
                       </div>
-                    ) : shp.status === 'shipped' ? (
+                    ) : shp.status === 'shipped' || shp.status === 'completed' ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         <button
                           type="button"
                           className="btn-secondary"
                           onClick={() => setActiveShipmentId(shp.id)}
-                          style={{ width: '100%', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
+                          style={{ width: '100%', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
                         >
-                          <CheckCircle2 size={15} /> Поставка отгружена (Детали)
+                          <Lock size={15} /> {shp.status === 'completed' ? '🏁 Завершена (Просмотр)' : '🚚 Отгружена (Просмотр)'}
                         </button>
                       </div>
                     ) : (

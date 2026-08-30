@@ -162,6 +162,12 @@ def process_barcode_scan(id: str, req: ScanRequest = Body(...), db: Session = De
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
 
+    if shipment.status in ["shipped", "completed"]:
+        return ScanResponse(
+            success=False,
+            message=f"Поставка уже {shipment.status}. Сканирование и приёмка заблокированы."
+        )
+
     item = db.query(ShipmentItemModel).filter(
         ShipmentItemModel.shipment_id == id,
         (ShipmentItemModel.barcode == barcode) | (ShipmentItemModel.sku.ilike(barcode))
@@ -224,6 +230,16 @@ def process_barcode_scan(id: str, req: ScanRequest = Body(...), db: Session = De
 
 @router.put("/{id}/items/{itemId}", response_model=ShipmentItemResponse)
 def update_item_details(id: str, itemId: str, req: UpdateItemDetailsRequest = Body(...), db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Изменение количества и параметров товаров заблокировано."
+        )
+
     item = db.query(ShipmentItemModel).filter(
         ShipmentItemModel.shipment_id == id,
         ShipmentItemModel.id == itemId
@@ -245,10 +261,7 @@ def update_item_details(id: str, itemId: str, req: UpdateItemDetailsRequest = Bo
         item.scanned_quantity = max(0, req.scannedQuantity)
         item.last_scanned_at = datetime.utcnow()
 
-    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
-    if shipment:
-        shipment.updated_at = datetime.utcnow()
-
+    shipment.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(item)
 
@@ -268,6 +281,16 @@ def update_item_details(id: str, itemId: str, req: UpdateItemDetailsRequest = Bo
 
 @router.delete("/{id}/items/{itemId}")
 def delete_item_from_shipment(id: str, itemId: str, db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Удаление товаров заблокировано."
+        )
+
     item = db.query(ShipmentItemModel).filter(
         ShipmentItemModel.shipment_id == id,
         ShipmentItemModel.id == itemId
@@ -294,6 +317,12 @@ def add_item_to_shipment(id: str, it: ShipmentItemBase = Body(...), db: Session 
     shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Добавление товаров заблокировано."
+        )
 
     barcode_clean = it.barcode.strip()
     sku_val = it.sku.strip() if it.sku else f"SKU-{barcode_clean}"
@@ -352,6 +381,12 @@ def create_box(id: str, req: CreateBoxRequest = Body(...), db: Session = Depends
     if not shipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
 
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Добавление коробок заблокировано."
+        )
+
     existing_boxes = db.query(PackingBoxModel).filter(PackingBoxModel.shipment_id == id).order_by(PackingBoxModel.id.asc()).all()
     for idx, b in enumerate(existing_boxes):
         b.box_number = idx + 1
@@ -373,6 +408,16 @@ def create_box(id: str, req: CreateBoxRequest = Body(...), db: Session = Depends
 
 @router.put("/{id}/boxes/{boxNumber}/warehouse")
 def update_box_warehouse(id: str, boxNumber: int, req: UpdateBoxWarehouseRequest = Body(...), db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Изменение склада коробки заблокировано."
+        )
+
     box = get_box_by_number(id, boxNumber, db)
     if not box:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
@@ -383,6 +428,16 @@ def update_box_warehouse(id: str, boxNumber: int, req: UpdateBoxWarehouseRequest
 
 @router.post("/{id}/boxes/{boxNumber}/pack")
 def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest = Body(...), db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Укладка товаров заблокирована."
+        )
+
     box = get_box_by_number(id, boxNumber, db)
     if not box:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
@@ -422,6 +477,16 @@ def pack_item_to_box(id: str, boxNumber: int, req: PackItemRequest = Body(...), 
 
 @router.post("/{id}/boxes/move")
 def move_items_between_boxes(id: str, req: MoveItemRequest = Body(...), db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Перемещение товаров заблокировано."
+        )
+
     from_box = get_box_by_number(id, req.fromBoxNumber, db)
     to_box = get_box_by_number(id, req.toBoxNumber, db)
     if not from_box or not to_box:
@@ -466,6 +531,16 @@ def move_items_between_boxes(id: str, req: MoveItemRequest = Body(...), db: Sess
 
 @router.delete("/{id}/boxes/{boxNumber}")
 def delete_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Удаление коробок заблокировано."
+        )
+
     box = get_box_by_number(id, boxNumber, db)
     if not box:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")
@@ -477,6 +552,16 @@ def delete_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
 
 @router.put("/{id}/boxes/{boxNumber}/seal")
 def seal_box(id: str, boxNumber: int, db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    if shipment.status in ["shipped", "completed"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Поставка уже {shipment.status}. Запечатывание/вскрытие коробок заблокировано."
+        )
+
     box = get_box_by_number(id, boxNumber, db)
     if not box:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Коробка не найдена")

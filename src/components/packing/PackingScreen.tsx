@@ -114,6 +114,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
   const sealedBoxesCount = shipment.boxes.filter((b) => b.isPacked).length;
   const allBoxesSealed = shipment.boxes.length > 0 && sealedBoxesCount === shipment.boxes.length;
   const isFullyPacked = totalScannedInShipment > 0 && remainingUnpacked === 0 && allBoxesSealed;
+  const isLocked = shipment.status === 'shipped' || shipment.status === 'completed';
 
   const handleCreateNewBox = async () => {
     const defaultWarehouse = shipment.targetWarehouses[0] || 'Коледино';
@@ -256,7 +257,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
             <Printer size={16} /> Упаковочный лист (Печать)
           </button>
 
-          {allBoxesSealed && shipment.status !== 'ready_to_ship' && shipment.status !== 'shipped' && (
+          {!isLocked && allBoxesSealed && shipment.status !== 'ready_to_ship' && (
             <button
               type="button"
               className="btn-primary"
@@ -267,7 +268,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
             </button>
           )}
 
-          {shipment.status === 'ready_to_ship' && (
+          {!isLocked && shipment.status === 'ready_to_ship' && (
             <button
               type="button"
               className="btn-primary"
@@ -278,13 +279,40 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
             </button>
           )}
 
-          {shipment.status !== 'shipped' && (
+          {!isLocked && (
             <button className="btn-primary" onClick={handleCreateNewBox} style={{ width: 'auto' }}>
               <PlusCircle size={16} /> Добавить Коробку
             </button>
           )}
+
+          {isLocked && (
+            <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56, 189, 248, 0.4)', padding: '0.45rem 0.85rem', fontSize: '0.85rem', fontWeight: 600 }}>
+              {shipment.status === 'completed' ? '🏁 Поставка завершена' : '🚚 Поставка отгружена (Архив)'}
+            </span>
+          )}
         </div>
       </div>
+
+      {/* ReadOnly Warning Alert */}
+      {isLocked && (
+        <div
+          style={{
+            background: 'rgba(56, 189, 248, 0.1)',
+            border: '1px solid rgba(56, 189, 248, 0.3)',
+            color: '#38bdf8',
+            padding: '0.75rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            fontWeight: 600
+          }}
+        >
+          <Lock size={18} />
+          <span>Поставка {shipment.status === 'completed' ? 'завершена' : 'отгружена водителю'}. Режим просмотра архива (состав коробок и товаров зафиксирован).</span>
+        </div>
+      )}
 
       {/* Success Notification Alert */}
       {successMessage && (
@@ -436,7 +464,16 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
 
             {/* Seal / Unseal Box Action Button */}
             <div style={{ marginBottom: '1.25rem' }}>
-              {activeBox.isPacked ? (
+              {isLocked ? (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setIsPrintModalOpen(true)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', fontSize: '0.85rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                >
+                  <Printer size={15} /> Печать ШК Коробки №{activeBox.boxNumber}
+                </button>
+              ) : activeBox.isPacked ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   <div
                     style={{
@@ -500,8 +537,8 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
                 className="form-input"
                 value={activeBox.targetWarehouse}
                 onChange={(e) => handleWarehouseChange(activeBox.boxNumber, e.target.value as WBWarehouse)}
-                disabled={activeBox.isPacked}
-                style={{ paddingLeft: '0.75rem', opacity: activeBox.isPacked ? 0.6 : 1 }}
+                disabled={isLocked || activeBox.isPacked}
+                style={{ paddingLeft: '0.75rem', opacity: isLocked || activeBox.isPacked ? 0.6 : 1 }}
               >
                 {AVAILABLE_WB_WAREHOUSES.map((wh) => (
                   <option key={wh} value={wh}>
@@ -512,7 +549,7 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
             </div>
 
             {/* Pack item into active box form */}
-            {!activeBox.isPacked ? (
+            {!isLocked && !activeBox.isPacked ? (
               <form onSubmit={handlePackItemSubmit} style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)' }}>
                 <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.75rem' }}>
                   Положить товар в Коробку №{activeBox.boxNumber}:
@@ -609,23 +646,25 @@ export const PackingScreen: React.FC<Props> = ({ shipmentId, initialShipment, on
               </form>
             ) : null}
 
-            <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
-              <button
-                className="btn-secondary"
-                onClick={() => handleDeleteBox(activeBox.boxNumber)}
-                disabled={activeBox.isPacked}
-                style={{ borderColor: 'rgba(244,63,94,0.3)', color: '#f43f5e', fontSize: '0.78rem', opacity: activeBox.isPacked ? 0.4 : 1 }}
-              >
-                <Trash2 size={14} /> Удалить Коробку №{activeBox.boxNumber}
-              </button>
-            </div>
+            {!isLocked && (
+              <div style={{ marginTop: '1.5rem', textAlign: 'right' }}>
+                <button
+                  className="btn-secondary"
+                  onClick={() => handleDeleteBox(activeBox.boxNumber)}
+                  disabled={activeBox.isPacked}
+                  style={{ borderColor: 'rgba(244,63,94,0.3)', color: '#f43f5e', fontSize: '0.78rem', opacity: activeBox.isPacked ? 0.4 : 1 }}
+                >
+                  <Trash2 size={14} /> Удалить Коробку №{activeBox.boxNumber}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Column: Items inside Active Box */}
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
             <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 600 }}>Содержимое Коробки №{activeBox.boxNumber} ({activeBox.items.reduce((a, c) => a + c.quantity, 0)} шт.)</span>
-              {activeBox.items.length > 0 && shipment.boxes.length > 1 && !activeBox.isPacked && (
+              {activeBox.items.length > 0 && shipment.boxes.length > 1 && !isLocked && !activeBox.isPacked && (
                 <button
                   className="btn-secondary"
                   onClick={() => setIsMoveModalOpen(true)}

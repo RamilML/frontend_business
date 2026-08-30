@@ -122,7 +122,24 @@ def test_full_api_workflow():
     created_act = r.json()
     print(f"   ✅ Акт создан успешно! Номер: {created_act['actNumber']}, ИТОГО: {created_act['totalSum']} сом/руб.")
 
-    print("\n🎉 ВСЕ ТЕСТЫ API ПРОШЛИ УСПЕШНО НА 100%!\n")
+    print("\n🔍 7. Тестирование блокировки изменений для отгруженной поставки:")
+    # Переводим поставку в статус 'shipped'
+    r = client.put(f"/api/v1/shipments/{shipment_id}", json={"status": "shipped"}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["status"] == "shipped"
+
+    # Попытка сканирования отгруженной поставки
+    r = client.post(f"/api/v1/shipments/{shipment_id}/scan", json={"barcode": test_barcode}, headers=headers)
+    assert r.status_code == 200
+    assert r.json()["success"] is False
+    print("   ✅ Сканирование отгруженной поставки заблокировано!")
+
+    # Попытка добавления коробки в отгруженную поставку
+    r = client.post(f"/api/v1/shipments/{shipment_id}/boxes", json={"targetWarehouse": "Коледино"}, headers=headers)
+    assert r.status_code == 400
+    print("   ✅ Добавление коробок в отгруженную поставку заблокировано (400 Bad Request)!")
+
+    print("\n🎉 ВСЕ ТЕСТЫ API И ЗАЩИТЫ БЛОКИРОВКИ ПРОШЛИ УСПЕШНО НА 100%!\n")
 
 if __name__ == "__main__":
     test_full_api_workflow()
