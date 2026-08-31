@@ -22,7 +22,9 @@ import {
   Search,
   CheckCircle2,
   PackagePlus,
-  Plus
+  Plus,
+  RefreshCw,
+  PlusCircle
 } from 'lucide-react';
 
 export const ClientDashboard: React.FC = () => {
@@ -42,9 +44,12 @@ export const ClientDashboard: React.FC = () => {
         ShipmentService.getShipments(),
         ActService.getActs()
       ]);
-      const clientName = user?.clientName || 'ООО "Модный Гардероб"';
-      const myShipments = shipmentsData.filter((s) => s.clientName === clientName || !user?.clientName);
-      const myActs = actsData.filter((a) => a.clientName === clientName || !user?.clientName);
+      const myShipments = user?.clientId
+        ? shipmentsData.filter((s) => s.clientId === user.clientId)
+        : shipmentsData;
+      const myActs = user?.clientId
+        ? actsData.filter((a) => a.clientId === user.clientId)
+        : actsData;
 
       setShipments(myShipments.length > 0 ? myShipments : shipmentsData);
       setActs(myActs.length > 0 ? myActs : actsData);
@@ -99,78 +104,206 @@ export const ClientDashboard: React.FC = () => {
   };
 
   return (
-    <div className="dashboard-container">
-      {/* Client Header */}
-      <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <Building2 color="#8b5cf6" size={24} /> Личный кабинет Клиента (Селлера WB)
-          </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Контрагент: <b style={{ color: 'var(--text-main)' }}>{user?.clientName || 'ООО "Модный Гардероб" (ИНН 7701234567)'}</b>
-          </p>
-        </div>
-
-        {/* Tab Navigation & Action */}
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+    <div>
+      {/* Sleek Sub-header Navigation Bar for Client */}
+      <div 
+        style={{
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '0.6rem 1.5rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '1rem',
+          overflowX: 'auto',
+          position: 'sticky',
+          top: 64,
+          zIndex: 40
+        }}
+      >
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', minWidth: 'max-content' }}>
+          {/* Tab 1: Overview */}
           <button
-            className={`btn-secondary ${activeTab === 'overview' ? 'active' : ''}`}
+            type="button"
             onClick={() => setActiveTab('overview')}
+            style={{
+              padding: '0.45rem 0.85rem',
+              borderRadius: 'var(--radius-md)',
+              border: activeTab === 'overview' ? '1px solid rgba(139, 92, 246, 0.45)' : '1px solid transparent',
+              background: activeTab === 'overview' ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
+              color: activeTab === 'overview' ? '#c4b5fd' : 'var(--text-muted)',
+              fontSize: '0.84rem',
+              fontWeight: activeTab === 'overview' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.18s ease'
+            }}
           >
-            <Package size={15} /> Поставки ({shipments.length})
+            <Package size={15} color={activeTab === 'overview' ? '#c4b5fd' : 'currentColor'} />
+            <span>Поставки селлера</span>
+            <span
+              style={{
+                background: activeTab === 'overview' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+                color: activeTab === 'overview' ? '#c4b5fd' : 'var(--text-muted)',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                padding: '0.05rem 0.4rem',
+                borderRadius: 999
+              }}
+            >
+              {shipments.length}
+            </span>
           </button>
 
+          {/* Tab 2: Boxes */}
           <button
-            className={`btn-secondary ${activeTab === 'boxes' ? 'active' : ''}`}
+            type="button"
             onClick={() => setActiveTab('boxes')}
+            style={{
+              padding: '0.45rem 0.85rem',
+              borderRadius: 'var(--radius-md)',
+              border: activeTab === 'boxes' ? '1px solid rgba(139, 92, 246, 0.45)' : '1px solid transparent',
+              background: activeTab === 'boxes' ? 'rgba(139, 92, 246, 0.15)' : 'transparent',
+              color: activeTab === 'boxes' ? '#c4b5fd' : 'var(--text-muted)',
+              fontSize: '0.84rem',
+              fontWeight: activeTab === 'boxes' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.18s ease'
+            }}
           >
-            <Box size={15} /> Состав Коробок
+            <Box size={15} color={activeTab === 'boxes' ? '#c4b5fd' : 'currentColor'} />
+            <span>Состав Коробок</span>
+            <span
+              style={{
+                background: activeTab === 'boxes' ? 'rgba(139, 92, 246, 0.3)' : 'rgba(255, 255, 255, 0.08)',
+                color: activeTab === 'boxes' ? '#c4b5fd' : 'var(--text-muted)',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                padding: '0.05rem 0.4rem',
+                borderRadius: 999
+              }}
+            >
+              {totalBoxes}
+            </span>
           </button>
 
+          {/* Tab 3: Acts */}
           <button
-            className={`btn-secondary ${activeTab === 'acts' ? 'active' : ''}`}
+            type="button"
             onClick={() => setActiveTab('acts')}
+            style={{
+              padding: '0.45rem 0.85rem',
+              borderRadius: 'var(--radius-md)',
+              border: activeTab === 'acts' ? '1px solid rgba(16, 185, 129, 0.45)' : '1px solid transparent',
+              background: activeTab === 'acts' ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+              color: activeTab === 'acts' ? '#34d399' : 'var(--text-muted)',
+              fontSize: '0.84rem',
+              fontWeight: activeTab === 'acts' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.18s ease'
+            }}
           >
-            <FileText size={15} /> Ваши Акты ({acts.length})
+            <FileText size={15} color={activeTab === 'acts' ? '#34d399' : 'currentColor'} />
+            <span>Ваши Акты</span>
+            <span
+              style={{
+                background: activeTab === 'acts' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                color: activeTab === 'acts' ? '#34d399' : 'var(--text-muted)',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                padding: '0.05rem 0.4rem',
+                borderRadius: 999
+              }}
+            >
+              {acts.length}
+            </span>
           </button>
+        </div>
 
-          <button
-            className="btn-primary"
-            onClick={() => setIsCreateShipmentOpen(true)}
-            style={{ width: 'auto', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', border: 'none', marginLeft: '0.5rem' }}
-          >
-            <PackagePlus size={16} /> Создать заявку на поставку
-          </button>
+        {/* Quick Right-side Status Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            Поставок селлера: <b style={{ color: '#c4b5fd' }}>{shipments.length}</b>
+          </span>
         </div>
       </div>
 
-      {/* Top Client Metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div className="card" style={{ marginBottom: 0, cursor: 'pointer' }} onClick={() => setActiveTab('overview')}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-            <span>Ваших поставок</span>
-            <Package size={20} color="#8b5cf6" />
+      <div className="dashboard-container">
+        {/* Client Header */}
+        <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <Building2 color="#8b5cf6" size={24} /> Личный кабинет Клиента (Селлера WB)
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              Контрагент: <b style={{ color: '#c4b5fd' }}>{user?.clientName || 'ООО "Модный Гардероб" (ИНН 7701234567)'}</b>
+            </p>
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>{shipments.length} поставки</div>
+
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn-secondary" onClick={loadClientData} title="Обновить данные">
+              <RefreshCw size={16} /> Обновить
+            </button>
+            <button 
+              className="btn-primary" 
+              onClick={() => setIsCreateShipmentOpen(true)}
+              style={{
+                width: 'auto',
+                background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                color: '#fff',
+                boxShadow: '0 4px 15px rgba(139, 92, 246, 0.35)',
+                border: 'none'
+              }}
+            >
+              <PlusCircle size={16} /> Создать заявку на поставку
+            </button>
+          </div>
         </div>
 
-        <div className="card" style={{ marginBottom: 0, cursor: 'pointer' }} onClick={() => setActiveTab('boxes')}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-            <span>Товаров отгружено</span>
-            <Truck size={20} color="#10b981" />
+        {/* Top Client Metrics */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div className="card" style={{ cursor: 'pointer', marginBottom: 0 }} onClick={() => setActiveTab('overview')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+              <span>Ваших поставок</span>
+              <Package size={20} color="#8b5cf6" />
+            </div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+              {shipments.length} в работе
+            </div>
+            <span style={{ fontSize: '0.75rem', color: '#c4b5fd' }}>Смотреть список поставок ↓</span>
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>{totalItemsOnWb} шт. в {totalBoxes} коробках</div>
-        </div>
 
-        <div className="card" style={{ marginBottom: 0, cursor: 'pointer' }} onClick={() => setActiveTab('acts')}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-            <span>Готовых Актов</span>
-            <FileText size={20} color="#3b82f6" />
+          <div className="card" style={{ cursor: 'pointer', marginBottom: 0 }} onClick={() => setActiveTab('boxes')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+              <span>Товаров на складе</span>
+              <Truck size={20} color="#10b981" />
+            </div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+              {totalItemsOnWb} шт.
+            </div>
+            <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>В {totalBoxes} запечатанных коробках →</span>
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>{acts.length} документа</div>
-          <span style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Скачать Excel / PDF →</span>
+
+          <div className="card" style={{ cursor: 'pointer', marginBottom: 0 }} onClick={() => setActiveTab('acts')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+              <span>Готовых Актов</span>
+              <FileText size={20} color="#3b82f6" />
+            </div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+              {acts.length} документов
+            </div>
+            <span style={{ fontSize: '0.75rem', color: '#38bdf8' }}>Скачать Excel / PDF →</span>
+          </div>
         </div>
-      </div>
 
       {/* TAB 1: Shipments Overview */}
       {activeTab === 'overview' && (
@@ -501,6 +634,7 @@ export const ClientDashboard: React.FC = () => {
           isClientMode={true}
         />
       )}
+      </div>
     </div>
   );
 };
