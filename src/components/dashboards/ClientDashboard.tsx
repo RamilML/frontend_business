@@ -6,6 +6,8 @@ import { ShipmentService } from '../../services/shipmentService';
 import { ActService } from '../../services/actService';
 import { ExportUtils } from '../../utils/exportUtils';
 import { PackingSlipPrintModal } from '../packing/PackingSlipPrintModal';
+import { NewShipmentModal } from '../scanning/NewShipmentModal';
+import { CreateShipmentDto } from '../../types/shipment';
 import {
   Building2,
   Package,
@@ -18,7 +20,9 @@ import {
   FileCode,
   Printer,
   Search,
-  CheckCircle2
+  CheckCircle2,
+  PackagePlus,
+  Plus
 } from 'lucide-react';
 
 export const ClientDashboard: React.FC = () => {
@@ -28,20 +32,36 @@ export const ClientDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'boxes' | 'acts'>('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [printShipment, setPrintShipment] = useState<Shipment | null>(null);
+  const [isCreateShipmentOpen, setIsCreateShipmentOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    Promise.all([ShipmentService.getShipments(), ActService.getActs()]).then(([shipmentsData, actsData]) => {
-      // Filter only current client data if client role
+  const loadClientData = async () => {
+    setIsLoading(true);
+    try {
+      const [shipmentsData, actsData] = await Promise.all([
+        ShipmentService.getShipments(),
+        ActService.getActs()
+      ]);
       const clientName = user?.clientName || 'ООО "Модный Гардероб"';
       const myShipments = shipmentsData.filter((s) => s.clientName === clientName || !user?.clientName);
       const myActs = actsData.filter((a) => a.clientName === clientName || !user?.clientName);
 
       setShipments(myShipments.length > 0 ? myShipments : shipmentsData);
       setActs(myActs.length > 0 ? myActs : actsData);
+    } finally {
       setIsLoading(false);
-    });
+    }
+  };
+
+  useEffect(() => {
+    loadClientData();
   }, [user]);
+
+  const handleCreateShipment = async (dto: CreateShipmentDto) => {
+    await ShipmentService.createShipment(dto);
+    await loadClientData();
+    setIsCreateShipmentOpen(false);
+  };
 
   const totalItemsOnWb = shipments.reduce((acc, s) => {
     return acc + s.items.reduce((sum, item) => sum + item.scannedQuantity, 0);
@@ -81,8 +101,8 @@ export const ClientDashboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Tab Navigation */}
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        {/* Tab Navigation & Action */}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             className={`btn-secondary ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveTab('overview')}
@@ -102,6 +122,14 @@ export const ClientDashboard: React.FC = () => {
             onClick={() => setActiveTab('acts')}
           >
             <FileText size={15} /> Ваши Акты ({acts.length})
+          </button>
+
+          <button
+            className="btn-primary"
+            onClick={() => setIsCreateShipmentOpen(true)}
+            style={{ width: 'auto', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)', border: 'none', marginLeft: '0.5rem' }}
+          >
+            <PackagePlus size={16} /> Создать заявку на поставку
           </button>
         </div>
       </div>
@@ -431,6 +459,18 @@ export const ClientDashboard: React.FC = () => {
           isOpen={!!printShipment}
           shipment={printShipment}
           onClose={() => setPrintShipment(null)}
+        />
+      )}
+
+      {/* New Shipment Modal for Client */}
+      {isCreateShipmentOpen && (
+        <NewShipmentModal
+          isOpen={isCreateShipmentOpen}
+          onClose={() => setIsCreateShipmentOpen(false)}
+          onCreateShipment={handleCreateShipment}
+          forcedClientId={user?.clientId || 'cl_9921'}
+          forcedClientName={user?.clientName || 'ООО "Модный Гардероб"'}
+          isClientMode={true}
         />
       )}
     </div>

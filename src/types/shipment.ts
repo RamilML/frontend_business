@@ -67,6 +67,7 @@ export interface CreateShipmentDto {
   shipmentNumber: string;
   clientId: string;
   targetWarehouses: WBWarehouse[];
+  status?: ShipmentStatus;
   initialItems?: Omit<ShipmentItem, 'id' | 'scannedQuantity'>[];
 }
 

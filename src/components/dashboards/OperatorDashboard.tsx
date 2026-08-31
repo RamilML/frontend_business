@@ -145,12 +145,12 @@ export const OperatorDashboard: React.FC = () => {
             <PackageCheck color="#10b981" size={24} /> Рабочее место Оператора (ТСД)
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Приёмка товаров по штрихкодам, скан-контроль и ручной учет на складе
+            Очередь поставок от селлеров на приёмку сканером, упаковку в коробки и отгрузку
           </p>
         </div>
 
-        <button className="btn-primary" onClick={() => setIsNewShipmentOpen(true)} style={{ width: 'auto' }}>
-          <PlusCircle size={18} /> Новая поставка
+        <button className="btn-secondary" onClick={() => setIsNewShipmentOpen(true)} style={{ width: 'auto', fontSize: '0.85rem' }}>
+          <PlusCircle size={15} /> Приёмка самопривоза (без заявки)
         </button>
       </div>
 

@@ -45,6 +45,7 @@ class ShipmentCreate(BaseModel):
     shipmentNumber: str
     clientId: str
     targetWarehouses: List[str]
+    status: Optional[str] = "receiving"
     initialItems: Optional[List[ShipmentItemBase]] = []
 
 class ShipmentUpdate(BaseModel):

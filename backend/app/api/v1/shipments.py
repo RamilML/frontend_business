@@ -128,7 +128,7 @@ def create_shipment(dto: ShipmentCreate = Body(...), db: Session = Depends(get_d
         client_id=dto.clientId,
         client_name=client_name,
         target_warehouses=dto.targetWarehouses,
-        status="draft"
+        status=dto.status or "receiving"
     )
     db.add(shipment)
     db.flush()
