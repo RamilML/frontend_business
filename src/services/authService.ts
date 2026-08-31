@@ -5,9 +5,9 @@ const STORAGE_KEY_USER = 'ff_assistant_user';
 const STORAGE_KEY_CONFIG = 'ff_assistant_api_config';
 
 export const DEFAULT_API_CONFIG: ApiConfig = {
-  baseUrl: 'http://localhost:8000/api/v1',
+  baseUrl: 'http://127.0.0.1:8000/api/v1',
   useMock: false,
-  timeoutMs: 5000,
+  timeoutMs: 8000,
 };
 
 // Моковые аккаунты под разные роли
@@ -52,7 +52,11 @@ export class AuthService {
     if (!saved) return DEFAULT_API_CONFIG;
     try {
       const parsed = JSON.parse(saved);
-      return { ...DEFAULT_API_CONFIG, ...parsed, useMock: false };
+      let baseUrl = parsed.baseUrl || DEFAULT_API_CONFIG.baseUrl;
+      if (baseUrl.includes('localhost:8000')) {
+        baseUrl = baseUrl.replace('localhost:8000', '127.0.0.1:8000');
+      }
+      return { ...DEFAULT_API_CONFIG, ...parsed, baseUrl, useMock: false };
     } catch {
       return DEFAULT_API_CONFIG;
     }
