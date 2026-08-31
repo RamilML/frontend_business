@@ -184,62 +184,166 @@ export const ManagerDashboard: React.FC = () => {
     }
   };
 
+  const pendingCount = shipments.filter((s) => s.status === 'draft').length;
+
   return (
     <div>
-      {/* Sub-header navigation bar for Manager */}
+      {/* Sleek Sub-header Navigation Bar for Manager */}
       <div 
         style={{
-          background: 'rgba(30, 41, 59, 0.4)',
-          borderBottom: '1px solid var(--border)',
-          padding: '0.5rem 1.5rem',
+          background: 'rgba(15, 23, 42, 0.75)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          padding: '0.6rem 1.5rem',
           display: 'flex',
-          gap: '0.75rem',
-          overflowX: 'auto'
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '1rem',
+          overflowX: 'auto',
+          position: 'sticky',
+          top: 64,
+          zIndex: 40
         }}
       >
-        <button
-          className={`btn-secondary ${activeTab === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveTab('dashboard')}
-          style={{
-            borderColor: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--border)',
-            color: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--text-muted)'
-          }}
-        >
-          <LayoutDashboard size={15} /> Обзор Менеджера
-        </button>
+        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', minWidth: 'max-content' }}>
+          {/* Tab 1: Dashboard */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('dashboard')}
+            style={{
+              padding: '0.45rem 0.85rem',
+              borderRadius: 'var(--radius-md)',
+              border: activeTab === 'dashboard' ? '1px solid rgba(245, 158, 11, 0.45)' : '1px solid transparent',
+              background: activeTab === 'dashboard' ? 'rgba(245, 158, 11, 0.12)' : 'transparent',
+              color: activeTab === 'dashboard' ? '#fbbf24' : 'var(--text-muted)',
+              fontSize: '0.84rem',
+              fontWeight: activeTab === 'dashboard' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.18s ease'
+            }}
+          >
+            <LayoutDashboard size={15} color={activeTab === 'dashboard' ? '#fbbf24' : 'currentColor'} />
+            <span>Сводка и Поставки</span>
+            {pendingCount > 0 && (
+              <span
+                style={{
+                  background: '#f59e0b',
+                  color: '#000',
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  padding: '0.05rem 0.4rem',
+                  borderRadius: 999
+                }}
+                title={`${pendingCount} заявок ожидают согласования слота`}
+              >
+                {pendingCount}
+              </span>
+            )}
+          </button>
 
-        <button
-          className={`btn-secondary ${activeTab === 'clients' ? 'active' : ''}`}
-          onClick={() => setActiveTab('clients')}
-          style={{
-            borderColor: activeTab === 'clients' ? 'var(--primary)' : 'var(--border)',
-            color: activeTab === 'clients' ? 'var(--primary)' : 'var(--text-muted)'
-          }}
-        >
-          <Building2 size={15} /> Справочник Клиентов ({clients.length})
-        </button>
+          {/* Tab 2: Clients */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('clients')}
+            style={{
+              padding: '0.45rem 0.85rem',
+              borderRadius: 'var(--radius-md)',
+              border: activeTab === 'clients' ? '1px solid rgba(139, 92, 246, 0.45)' : '1px solid transparent',
+              background: activeTab === 'clients' ? 'rgba(139, 92, 246, 0.12)' : 'transparent',
+              color: activeTab === 'clients' ? '#c4b5fd' : 'var(--text-muted)',
+              fontSize: '0.84rem',
+              fontWeight: activeTab === 'clients' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.18s ease'
+            }}
+          >
+            <Building2 size={15} color={activeTab === 'clients' ? '#c4b5fd' : 'currentColor'} />
+            <span>База Клиентов</span>
+            <span
+              style={{
+                background: activeTab === 'clients' ? 'rgba(139, 92, 246, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                color: activeTab === 'clients' ? '#c4b5fd' : 'var(--text-muted)',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                padding: '0.05rem 0.4rem',
+                borderRadius: 999
+              }}
+            >
+              {clients.length}
+            </span>
+          </button>
 
-        <button
-          className={`btn-secondary ${activeTab === 'acts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('acts')}
-          style={{
-            borderColor: activeTab === 'acts' ? 'var(--primary)' : 'var(--border)',
-            color: activeTab === 'acts' ? 'var(--primary)' : 'var(--text-muted)'
-          }}
-        >
-          <FileText size={15} /> Акты выполненных работ ({acts.length})
-        </button>
+          {/* Tab 3: Acts */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('acts')}
+            style={{
+              padding: '0.45rem 0.85rem',
+              borderRadius: 'var(--radius-md)',
+              border: activeTab === 'acts' ? '1px solid rgba(16, 185, 129, 0.45)' : '1px solid transparent',
+              background: activeTab === 'acts' ? 'rgba(16, 185, 129, 0.12)' : 'transparent',
+              color: activeTab === 'acts' ? '#34d399' : 'var(--text-muted)',
+              fontSize: '0.84rem',
+              fontWeight: activeTab === 'acts' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.18s ease'
+            }}
+          >
+            <FileText size={15} color={activeTab === 'acts' ? '#34d399' : 'currentColor'} />
+            <span>Акты и Расчёты</span>
+            <span
+              style={{
+                background: activeTab === 'acts' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(255, 255, 255, 0.08)',
+                color: activeTab === 'acts' ? '#34d399' : 'var(--text-muted)',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                padding: '0.05rem 0.4rem',
+                borderRadius: 999
+              }}
+            >
+              {acts.length}
+            </span>
+          </button>
 
-        <button
-          className={`btn-secondary ${activeTab === 'documents' ? 'active' : ''}`}
-          onClick={() => setActiveTab('documents')}
-          style={{
-            borderColor: activeTab === 'documents' ? 'var(--primary)' : 'var(--border)',
-            color: activeTab === 'documents' ? 'var(--primary)' : 'var(--text-muted)'
-          }}
-        >
-          <Download size={15} /> Центр Выгрузки (Excel / PDF / Word)
-        </button>
+          {/* Tab 4: Export Center */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('documents')}
+            style={{
+              padding: '0.45rem 0.85rem',
+              borderRadius: 'var(--radius-md)',
+              border: activeTab === 'documents' ? '1px solid rgba(59, 130, 246, 0.45)' : '1px solid transparent',
+              background: activeTab === 'documents' ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+              color: activeTab === 'documents' ? '#93c5fd' : 'var(--text-muted)',
+              fontSize: '0.84rem',
+              fontWeight: activeTab === 'documents' ? 600 : 500,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.45rem',
+              transition: 'all 0.18s ease'
+            }}
+          >
+            <Download size={15} color={activeTab === 'documents' ? '#93c5fd' : 'currentColor'} />
+            <span>Экспорт и Отчёты</span>
+          </button>
+        </div>
+
+        {/* Quick Right-side Status Indicator */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            Активных поставок: <b style={{ color: '#fbbf24' }}>{activeShipments.length}</b>
+          </span>
+        </div>
       </div>
 
       {activeTab === 'clients' ? (
