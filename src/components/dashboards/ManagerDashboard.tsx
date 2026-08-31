@@ -465,16 +465,16 @@ export const ManagerDashboard: React.FC = () => {
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                <table style={{ width: '100%', minWidth: 960, borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
                   <thead>
                     <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                      <th style={{ padding: '0.75rem 1rem' }}>Номер поставки</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Поставщик (Селлер)</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Склады WB</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Прогресс склада (План / Факт)</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Коробки</th>
-                      <th style={{ padding: '0.75rem 1rem' }}>Статус</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>Действия менеджера</th>
+                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Номер поставки</th>
+                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Поставщик (Селлер)</th>
+                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Склады WB</th>
+                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Прогресс склада (План / Факт)</th>
+                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Коробки</th>
+                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Статус</th>
+                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Действия менеджера</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -487,18 +487,25 @@ export const ManagerDashboard: React.FC = () => {
                       return (
                         <tr key={shp.id} style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.4)' }}>
                           {/* Shipment Number */}
-                          <td style={{ padding: '0.85rem 1rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--primary)' }}>
-                            {shp.shipmentNumber}
-                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>
-                              {new Date(shp.createdAt).toLocaleDateString('ru-RU')}
+                          <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--primary)', fontSize: '0.95rem' }}>
+                              {shp.shipmentNumber}
+                            </span>
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400, marginTop: 2 }}>
+                              создана: {new Date(shp.createdAt).toLocaleDateString('ru-RU')}
                             </div>
                           </td>
 
                           {/* Client Name */}
-                          <td style={{ padding: '0.85rem 1rem' }}>
-                            <div style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <Building2 size={13} color="var(--primary)" /> {shp.clientName}
+                          <td style={{ padding: '0.85rem 1rem', minWidth: 170 }}>
+                            <div style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
+                              <Building2 size={14} color="#8b5cf6" /> {shp.clientName}
                             </div>
+                            {shp.driverInfo && (
+                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 2, whiteSpace: 'nowrap' }}>
+                                🚛 {shp.driverInfo}
+                              </div>
+                            )}
                             {shp.operatorName && (
                               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                                 Оператор: {shp.operatorName}
@@ -510,7 +517,7 @@ export const ManagerDashboard: React.FC = () => {
                           <td style={{ padding: '0.85rem 1rem' }}>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
                               {shp.targetWarehouses.map((wh) => (
-                                <span key={wh} style={{ fontSize: '0.75rem', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid var(--border)', padding: '0.1rem 0.35rem', borderRadius: 4 }}>
+                                <span key={wh} style={{ fontSize: '0.75rem', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid var(--border)', padding: '0.1rem 0.35rem', borderRadius: 4, whiteSpace: 'nowrap' }}>
                                   {wh}
                                 </span>
                               ))}
@@ -519,7 +526,7 @@ export const ManagerDashboard: React.FC = () => {
 
                           {/* Progress */}
                           <td style={{ padding: '0.85rem 1rem', minWidth: 160 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem', whiteSpace: 'nowrap' }}>
                               <span>Принято: <b>{totalScanned}/{totalPlanned} шт.</b></span>
                               <b style={{ color: percent >= 100 ? '#10b981' : 'var(--primary)' }}>{percent}%</b>
                             </div>
@@ -536,7 +543,7 @@ export const ManagerDashboard: React.FC = () => {
                           </td>
 
                           {/* Boxes */}
-                          <td style={{ padding: '0.85rem 1rem' }}>
+                          <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
                             <span style={{ fontWeight: 600 }}>{shp.boxes.length} шт.</span>
                             {shp.boxes.length > 0 && (
                               <div style={{ fontSize: '0.72rem', color: sealedBoxes === shp.boxes.length ? '#34d399' : 'var(--text-muted)' }}>
@@ -546,56 +553,130 @@ export const ManagerDashboard: React.FC = () => {
                           </td>
 
                           {/* Status */}
-                          <td style={{ padding: '0.85rem 1rem' }}>
+                          <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
                             {getStatusBadge(shp.status)}
+                            {shp.status === 'approved' && (
+                              <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: 3 }}>
+                                {shp.gateNumber || 'Ворота № 1'}
+                                {shp.plannedDeliveryDate && ` • ${new Date(shp.plannedDeliveryDate).toLocaleDateString('ru-RU')}`}
+                              </div>
+                            )}
+                            {shp.status === 'draft' && shp.plannedDeliveryDate && (
+                              <div style={{ fontSize: '0.72rem', color: '#fbbf24', marginTop: 3 }}>
+                                привоз: {new Date(shp.plannedDeliveryDate).toLocaleDateString('ru-RU')}
+                              </div>
+                            )}
                           </td>
 
                           {/* Actions */}
-                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
+                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
-                              {/* Create Act Button */}
-                              <button
-                                type="button"
-                                className="btn-primary"
-                                onClick={() => setActiveShipmentForAct(shp)}
-                                style={{
-                                  padding: '0.35rem 0.65rem',
-                                  fontSize: '0.78rem',
-                                  background: '#10b981',
-                                  borderColor: '#10b981',
-                                  color: '#fff',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '0.3rem'
-                                }}
-                                title="Сформировать Акт выполненных работ на основе принятых товаров и коробок"
-                              >
-                                <FileText size={13} /> Сформировать Акт
-                              </button>
+                              {/* Conditional Primary Action based on Lifecycle */}
+                              {shp.status === 'draft' && (
+                                <button
+                                  type="button"
+                                  className="btn-primary"
+                                  onClick={() => handleApproveShipment(shp.id, 'Ворота № 1')}
+                                  style={{
+                                    padding: '0.35rem 0.65rem',
+                                    fontSize: '0.78rem',
+                                    background: '#10b981',
+                                    borderColor: '#10b981',
+                                    color: '#fff',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem'
+                                  }}
+                                  title="Одобрить заявку клиента и подтвердить слот"
+                                >
+                                  <CheckCircle2 size={13} /> Одобрить слот
+                                </button>
+                              )}
 
-                              {/* Inspect / Scan Screen */}
-                              <button
-                                type="button"
-                                className="btn-secondary"
-                                onClick={() => setActiveShipmentId(shp.id)}
-                                style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem' }}
-                                title="Открыть поставку (просмотр сканера и коробок)"
-                              >
-                                <Eye size={13} />
-                              </button>
+                              {shp.status === 'approved' && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => setActiveShipmentId(shp.id)}
+                                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
+                                  title="Просмотреть план товаров поставки"
+                                >
+                                  <Eye size={13} /> Открыть план
+                                </button>
+                              )}
+
+                              {(shp.status === 'receiving' || shp.status === 'packing') && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => setActiveShipmentId(shp.id)}
+                                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                                  title="Открыть экран приёмки и скан-контроля"
+                                >
+                                  <PackageCheck size={13} /> Скан-контроль
+                                </button>
+                              )}
+
+                              {(shp.status === 'ready_to_ship' || shp.status === 'shipped') && (
+                                <button
+                                  type="button"
+                                  className="btn-primary"
+                                  onClick={() => setActiveShipmentForAct(shp)}
+                                  style={{
+                                    padding: '0.35rem 0.65rem',
+                                    fontSize: '0.78rem',
+                                    background: '#10b981',
+                                    borderColor: '#10b981',
+                                    color: '#fff',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem'
+                                  }}
+                                  title="Сформировать Акт выполненных работ на основе принятых товаров и коробок"
+                                >
+                                  <FileText size={13} /> Сформировать Акт
+                                </button>
+                              )}
+
+                              {shp.status === 'completed' && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => setActiveShipmentForAct(shp)}
+                                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', borderColor: '#3b82f6', color: '#3b82f6' }}
+                                  title="Просмотр выставленного Акта"
+                                >
+                                  <FileText size={13} /> Просмотр Акта
+                                </button>
+                              )}
+
+                              {/* Secondary icon buttons */}
+                              {shp.status !== 'approved' && shp.status !== 'draft' && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => setActiveShipmentId(shp.id)}
+                                  style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem' }}
+                                  title="Открыть поставку (просмотр сканера и коробок)"
+                                >
+                                  <Eye size={13} />
+                                </button>
+                              )}
 
                               {/* Edit */}
-                              <button
-                                type="button"
-                                className="btn-secondary"
-                                onClick={() => setEditingShipment(shp)}
-                                style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem', color: '#38bdf8' }}
-                                title="Редактировать поставку"
-                              >
-                                <Edit2 size={13} />
-                              </button>
+                              {shp.status !== 'shipped' && shp.status !== 'completed' && (
+                                <button
+                                  type="button"
+                                  className="btn-secondary"
+                                  onClick={() => setEditingShipment(shp)}
+                                  style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem', color: '#38bdf8' }}
+                                  title="Редактировать поставку"
+                                >
+                                  <Edit2 size={13} />
+                                </button>
+                              )}
 
-                              {/* Complete */}
+                              {/* Complete button for shipped */}
                               {shp.status === 'shipped' && (
                                 <button
                                   type="button"

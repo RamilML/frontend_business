@@ -305,7 +305,7 @@ input[type="number"] {
   font-weight: 600;
 }
 
-/* Role Badges */
+/* Role & Status Badges */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -314,7 +314,8 @@ input[type="number"] {
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 600;
-  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 .badge-operator {
