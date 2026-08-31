@@ -573,16 +573,16 @@ export const ManagerDashboard: React.FC = () => {
               </div>
             ) : (
               <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', minWidth: 960, borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.88rem' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.86rem' }}>
                   <thead>
                     <tr style={{ background: 'rgba(15, 23, 42, 0.6)', borderBottom: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Номер поставки</th>
-                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Поставщик (Селлер)</th>
-                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Склады WB</th>
-                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Прогресс склада (План / Факт)</th>
-                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Коробки</th>
-                      <th style={{ padding: '0.75rem 1rem', whiteSpace: 'nowrap' }}>Статус</th>
-                      <th style={{ padding: '0.75rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Действия менеджера</th>
+                      <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Номер поставки</th>
+                      <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Поставщик (Селлер)</th>
+                      <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Склады WB</th>
+                      <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Прогресс склада</th>
+                      <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Коробки</th>
+                      <th style={{ padding: '0.65rem 0.75rem', whiteSpace: 'nowrap' }}>Статус</th>
+                      <th style={{ padding: '0.65rem 0.75rem', textAlign: 'right', whiteSpace: 'nowrap' }}>Действия</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -595,8 +595,8 @@ export const ManagerDashboard: React.FC = () => {
                       return (
                         <tr key={shp.id} style={{ borderBottom: '1px solid rgba(51, 65, 85, 0.4)' }}>
                           {/* Shipment Number */}
-                          <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
-                            <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--primary)', fontSize: '0.95rem' }}>
+                          <td style={{ padding: '0.75rem 0.75rem', whiteSpace: 'nowrap' }}>
+                            <span style={{ fontWeight: 700, fontFamily: 'var(--font-mono)', color: 'var(--primary)', fontSize: '0.92rem' }}>
                               {shp.shipmentNumber}
                             </span>
                             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400, marginTop: 2 }}>
@@ -605,7 +605,7 @@ export const ManagerDashboard: React.FC = () => {
                           </td>
 
                           {/* Client Name */}
-                          <td style={{ padding: '0.85rem 1rem', minWidth: 170 }}>
+                          <td style={{ padding: '0.75rem 0.75rem', minWidth: 150 }}>
                             <div style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
                               <Building2 size={14} color="#8b5cf6" /> {shp.clientName}
                             </div>
@@ -622,10 +622,10 @@ export const ManagerDashboard: React.FC = () => {
                           </td>
 
                           {/* WB Warehouses */}
-                          <td style={{ padding: '0.85rem 1rem' }}>
+                          <td style={{ padding: '0.75rem 0.75rem', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
                               {shp.targetWarehouses.map((wh) => (
-                                <span key={wh} style={{ fontSize: '0.75rem', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid var(--border)', padding: '0.1rem 0.35rem', borderRadius: 4, whiteSpace: 'nowrap' }}>
+                                <span key={wh} style={{ fontSize: '0.72rem', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid var(--border)', padding: '0.1rem 0.35rem', borderRadius: 4, whiteSpace: 'nowrap' }}>
                                   {wh}
                                 </span>
                               ))}
@@ -633,9 +633,9 @@ export const ManagerDashboard: React.FC = () => {
                           </td>
 
                           {/* Progress */}
-                          <td style={{ padding: '0.85rem 1rem', minWidth: 160 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '0.25rem', whiteSpace: 'nowrap' }}>
-                              <span>Принято: <b>{totalScanned}/{totalPlanned} шт.</b></span>
+                          <td style={{ padding: '0.75rem 0.75rem', minWidth: 140 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', marginBottom: '0.25rem', whiteSpace: 'nowrap' }}>
+                              <span>Принято: <b>{totalScanned}/{totalPlanned}</b></span>
                               <b style={{ color: percent >= 100 ? '#10b981' : 'var(--primary)' }}>{percent}%</b>
                             </div>
                             <div style={{ height: 5, background: 'rgba(255, 255, 255, 0.1)', borderRadius: 999 }}>
@@ -651,7 +651,7 @@ export const ManagerDashboard: React.FC = () => {
                           </td>
 
                           {/* Boxes */}
-                          <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '0.75rem 0.75rem', whiteSpace: 'nowrap' }}>
                             <span style={{ fontWeight: 600 }}>{shp.boxes.length} шт.</span>
                             {shp.boxes.length > 0 && (
                               <div style={{ fontSize: '0.72rem', color: sealedBoxes === shp.boxes.length ? '#34d399' : 'var(--text-muted)' }}>
@@ -661,7 +661,7 @@ export const ManagerDashboard: React.FC = () => {
                           </td>
 
                           {/* Status */}
-                          <td style={{ padding: '0.85rem 1rem', whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '0.75rem 0.75rem', whiteSpace: 'nowrap' }}>
                             {getStatusBadge(shp.status)}
                             {shp.status === 'approved' && (
                               <div style={{ fontSize: '0.72rem', color: '#34d399', marginTop: 3 }}>
@@ -677,8 +677,8 @@ export const ManagerDashboard: React.FC = () => {
                           </td>
 
                           {/* Actions */}
-                          <td style={{ padding: '0.85rem 1rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+                          <td style={{ padding: '0.75rem 0.75rem', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'inline-flex', gap: '0.35rem', justifyContent: 'flex-end', alignItems: 'center' }}>
                               {/* Conditional Primary Action based on Lifecycle */}
                               {shp.status === 'draft' && (
                                 <button
@@ -686,18 +686,19 @@ export const ManagerDashboard: React.FC = () => {
                                   className="btn-primary"
                                   onClick={() => handleApproveShipment(shp.id, 'Ворота № 1')}
                                   style={{
-                                    padding: '0.35rem 0.65rem',
+                                    padding: '0.32rem 0.6rem',
                                     fontSize: '0.78rem',
                                     background: '#10b981',
                                     borderColor: '#10b981',
                                     color: '#fff',
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '0.3rem'
+                                    gap: '0.25rem',
+                                    whiteSpace: 'nowrap'
                                   }}
                                   title="Одобрить заявку клиента и подтвердить слот"
                                 >
-                                  <CheckCircle2 size={13} /> Одобрить слот
+                                  <CheckCircle2 size={13} /> Одобрить
                                 </button>
                               )}
 
@@ -706,10 +707,10 @@ export const ManagerDashboard: React.FC = () => {
                                   type="button"
                                   className="btn-secondary"
                                   onClick={() => setActiveShipmentId(shp.id)}
-                                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8' }}
+                                  style={{ padding: '0.32rem 0.6rem', fontSize: '0.78rem', borderColor: 'rgba(56, 189, 248, 0.4)', color: '#38bdf8', whiteSpace: 'nowrap' }}
                                   title="Просмотреть план товаров поставки"
                                 >
-                                  <Eye size={13} /> Открыть план
+                                  <Eye size={13} /> План
                                 </button>
                               )}
 
@@ -718,10 +719,10 @@ export const ManagerDashboard: React.FC = () => {
                                   type="button"
                                   className="btn-secondary"
                                   onClick={() => setActiveShipmentId(shp.id)}
-                                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                                  style={{ padding: '0.32rem 0.6rem', fontSize: '0.78rem', borderColor: 'var(--primary)', color: 'var(--primary)', whiteSpace: 'nowrap' }}
                                   title="Открыть экран приёмки и скан-контроля"
                                 >
-                                  <PackageCheck size={13} /> Скан-контроль
+                                  <PackageCheck size={13} /> Скан
                                 </button>
                               )}
 
@@ -731,14 +732,16 @@ export const ManagerDashboard: React.FC = () => {
                                   className="btn-primary"
                                   onClick={() => setActiveShipmentForAct(shp)}
                                   style={{
-                                    padding: '0.35rem 0.65rem',
+                                    padding: '0.32rem 0.65rem',
                                     fontSize: '0.78rem',
-                                    background: '#10b981',
+                                    background: 'linear-gradient(135deg, #10b981, #059669)',
                                     borderColor: '#10b981',
                                     color: '#fff',
                                     display: 'inline-flex',
                                     alignItems: 'center',
-                                    gap: '0.3rem'
+                                    gap: '0.3rem',
+                                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                                    whiteSpace: 'nowrap'
                                   }}
                                   title="Сформировать Акт выполненных работ на основе принятых товаров и коробок"
                                 >
@@ -751,10 +754,10 @@ export const ManagerDashboard: React.FC = () => {
                                   type="button"
                                   className="btn-secondary"
                                   onClick={() => setActiveShipmentForAct(shp)}
-                                  style={{ padding: '0.35rem 0.65rem', fontSize: '0.78rem', borderColor: '#3b82f6', color: '#3b82f6' }}
+                                  style={{ padding: '0.32rem 0.6rem', fontSize: '0.78rem', borderColor: '#3b82f6', color: '#3b82f6', whiteSpace: 'nowrap' }}
                                   title="Просмотр выставленного Акта"
                                 >
-                                  <FileText size={13} /> Просмотр Акта
+                                  <FileText size={13} /> Акт
                                 </button>
                               )}
 
@@ -764,7 +767,7 @@ export const ManagerDashboard: React.FC = () => {
                                   type="button"
                                   className="btn-secondary"
                                   onClick={() => setActiveShipmentId(shp.id)}
-                                  style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem' }}
+                                  style={{ padding: '0.32rem 0.5rem', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
                                   title="Открыть поставку (просмотр сканера и коробок)"
                                 >
                                   <Eye size={13} />
@@ -777,7 +780,7 @@ export const ManagerDashboard: React.FC = () => {
                                   type="button"
                                   className="btn-secondary"
                                   onClick={() => setEditingShipment(shp)}
-                                  style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem', color: '#38bdf8' }}
+                                  style={{ padding: '0.32rem 0.5rem', fontSize: '0.78rem', color: '#38bdf8', whiteSpace: 'nowrap' }}
                                   title="Редактировать поставку"
                                 >
                                   <Edit2 size={13} />
@@ -790,7 +793,7 @@ export const ManagerDashboard: React.FC = () => {
                                   type="button"
                                   className="btn-secondary"
                                   onClick={() => handleCompleteShipment(shp.id)}
-                                  style={{ padding: '0.35rem 0.55rem', fontSize: '0.78rem', color: '#34d399' }}
+                                  style={{ padding: '0.32rem 0.5rem', fontSize: '0.78rem', color: '#34d399', whiteSpace: 'nowrap' }}
                                   title="Закрыть и завершить поставку"
                                 >
                                   <CheckCheck size={13} />
