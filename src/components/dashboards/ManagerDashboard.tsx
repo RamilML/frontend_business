@@ -347,9 +347,9 @@ export const ManagerDashboard: React.FC = () => {
       </div>
 
       {activeTab === 'clients' ? (
-        <ClientList onSelectClientForShipment={() => setIsNewShipmentOpen(true)} />
+        <ClientList onSelectClientForShipment={() => setIsNewShipmentOpen(true)} onNavigateTab={setActiveTab} />
       ) : activeTab === 'acts' ? (
-        <ActListScreen />
+        <ActListScreen onNavigateTab={setActiveTab} />
       ) : activeTab === 'documents' ? (
         <DocumentRegistryScreen />
       ) : (
@@ -378,9 +378,9 @@ export const ManagerDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Dynamic Stats Grid */}
+          {/* Dynamic Stats Grid with Tab Links */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div className="card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('clients')}>
+            <div className="card" style={{ cursor: 'pointer', marginBottom: 0 }} onClick={() => setActiveTab('clients')}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                 <span>Активных поставщиков</span>
                 <Users size={20} color="#3b82f6" />
@@ -391,7 +391,11 @@ export const ManagerDashboard: React.FC = () => {
               <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>Открыть базу клиентов →</span>
             </div>
 
-            <div className="card">
+            <div
+              className="card"
+              style={{ cursor: 'pointer', marginBottom: 0 }}
+              onClick={() => setSelectedStatusFilter('active')}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                 <span>Поставок в работе склада</span>
                 <TrendingUp size={20} color="var(--primary)" />
@@ -399,12 +403,12 @@ export const ManagerDashboard: React.FC = () => {
               <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
                 {activeShipments.length} в работе
               </div>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {readyOrShippedCount} готовы к расчету
+              <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
+                {readyOrShippedCount > 0 ? `${readyOrShippedCount} готовы к расчету →` : 'Показать в работе ↓'}
               </span>
             </div>
 
-            <div className="card" style={{ cursor: 'pointer' }} onClick={() => setActiveTab('acts')}>
+            <div className="card" style={{ cursor: 'pointer', marginBottom: 0 }} onClick={() => setActiveTab('acts')}>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
                 <span>Сформировано Актов</span>
                 <FileText size={20} color="#10b981" />

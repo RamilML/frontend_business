@@ -25,9 +25,10 @@ import {
 
 interface Props {
   onSelectClientForShipment?: (client: Client) => void;
+  onNavigateTab?: (tab: 'dashboard' | 'clients' | 'acts' | 'documents') => void;
 }
 
-export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
+export const ClientList: React.FC<Props> = ({ onSelectClientForShipment, onNavigateTab }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [acts, setActs] = useState<Act[]>([]);
@@ -114,7 +115,7 @@ export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
         </button>
       </div>
 
-      {/* Top Stats Cards (Identical to Manager Dashboard) */}
+      {/* Top Stats Cards with Active Navigation Links */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ marginBottom: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
@@ -124,12 +125,16 @@ export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
           <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
             {clients.length} контрагентов
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
             В базе: {clients.length} компаний
           </span>
         </div>
 
-        <div className="card" style={{ marginBottom: 0 }}>
+        <div
+          className="card"
+          style={{ marginBottom: 0, cursor: onNavigateTab ? 'pointer' : 'default' }}
+          onClick={() => onNavigateTab?.('dashboard')}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
             <span>Поставок в работе склада</span>
             <TrendingUp size={20} color="var(--primary)" />
@@ -137,12 +142,16 @@ export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
           <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
             {activeShipments.length} в работе
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            {readyOrShippedCount} готовы к расчету
+          <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
+            {onNavigateTab ? 'Перейти к поставкам →' : `${readyOrShippedCount} готовы к расчету`}
           </span>
         </div>
 
-        <div className="card" style={{ marginBottom: 0 }}>
+        <div
+          className="card"
+          style={{ marginBottom: 0, cursor: onNavigateTab ? 'pointer' : 'default' }}
+          onClick={() => onNavigateTab?.('acts')}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
             <span>Сформировано Актов</span>
             <FileText size={20} color="#10b981" />
@@ -151,7 +160,7 @@ export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
             {acts.length} актов
           </div>
           <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>
-            {totalRevenue.toLocaleString()} сом/руб. выручки
+            {onNavigateTab ? 'Открыть реестр актов →' : `${totalRevenue.toLocaleString()} сом/руб. выручки`}
           </span>
         </div>
       </div>

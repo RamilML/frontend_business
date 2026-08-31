@@ -4,7 +4,11 @@ import { ActService } from '../../services/actService';
 import { ActGeneratorScreen } from './ActGeneratorScreen';
 import { FileText, PlusCircle, Search, Printer, Edit, Trash2, Building2, CheckCircle2, TrendingUp, Users } from 'lucide-react';
 
-export const ActListScreen: React.FC = () => {
+interface Props {
+  onNavigateTab?: (tab: 'dashboard' | 'clients' | 'acts' | 'documents') => void;
+}
+
+export const ActListScreen: React.FC<Props> = ({ onNavigateTab }) => {
   const [acts, setActs] = useState<Act[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -83,7 +87,7 @@ export const ActListScreen: React.FC = () => {
         </button>
       </div>
 
-      {/* Top Stats Cards */}
+      {/* Top Stats Cards with Navigation Links */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ marginBottom: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
@@ -98,7 +102,11 @@ export const ActListScreen: React.FC = () => {
           </span>
         </div>
 
-        <div className="card" style={{ marginBottom: 0 }}>
+        <div
+          className="card"
+          style={{ marginBottom: 0, cursor: onNavigateTab ? 'pointer' : 'default' }}
+          onClick={() => onNavigateTab?.('dashboard')}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
             <span>Средний чек акта</span>
             <TrendingUp size={20} color="var(--primary)" />
@@ -106,12 +114,16 @@ export const ActListScreen: React.FC = () => {
           <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
             {avgCheck.toLocaleString()} сом/руб.
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            По всем 13 тарифам услуг
+          <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
+            {onNavigateTab ? 'Перейти к поставкам →' : 'По всем 13 тарифам услуг'}
           </span>
         </div>
 
-        <div className="card" style={{ marginBottom: 0 }}>
+        <div
+          className="card"
+          style={{ marginBottom: 0, cursor: onNavigateTab ? 'pointer' : 'default' }}
+          onClick={() => onNavigateTab?.('clients')}
+        >
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
             <span>Охвачено контрагентов</span>
             <Users size={20} color="#3b82f6" />
@@ -120,7 +132,7 @@ export const ActListScreen: React.FC = () => {
             {uniqueClients} селлеров
           </div>
           <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
-            Получили закрывающие акты
+            {onNavigateTab ? 'Открыть базу клиентов →' : 'Получили закрывающие акты'}
           </span>
         </div>
       </div>
