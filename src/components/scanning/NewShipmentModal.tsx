@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreateShipmentDto, WBWarehouse, ShipmentItem } from '../../types/shipment';
+import { CreateShipmentDto, WBWarehouse, ShipmentItem, ShipmentStatus } from '../../types/shipment';
 import { Client } from '../../types/client';
 import { ClientService } from '../../services/clientService';
 import {
@@ -51,6 +51,8 @@ export const NewShipmentModal: React.FC<Props> = ({
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const [plannedDeliveryDate, setPlannedDeliveryDate] = useState(tomorrow);
   const [driverInfo, setDriverInfo] = useState('');
+  const [assignedGate, setAssignedGate] = useState('Ворота № 1 (Рампа)');
+  const [managerLaunchMode, setManagerLaunchMode] = useState<'approved' | 'receiving'>('approved');
   const [selectedWarehouses, setSelectedWarehouses] = useState<WBWarehouse[]>(['Коледино']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -172,13 +174,16 @@ export const NewShipmentModal: React.FC<Props> = ({
     setError(null);
 
     try {
+      const finalStatus: ShipmentStatus = isClientMode ? 'draft' : managerLaunchMode;
+
       const dto: CreateShipmentDto = {
         shipmentNumber: shipmentNumber.trim(),
         clientId: finalClientId,
         targetWarehouses: selectedWarehouses,
-        status: isClientMode ? 'draft' : 'receiving',
+        status: finalStatus,
         plannedDeliveryDate,
         driverInfo: driverInfo.trim() || undefined,
+        gateNumber: isClientMode ? undefined : assignedGate,
         initialItems: plannedItems
       };
 
@@ -193,18 +198,27 @@ export const NewShipmentModal: React.FC<Props> = ({
 
   return (
     <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: 720, maxHeight: '92vh', overflowY: 'auto' }}>
+      <div className="modal-content" style={{ maxWidth: 740, maxHeight: '92vh', overflowY: 'auto' }}>
         {/* Modal Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
           <div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <PackagePlus color="var(--primary)" size={24} />
-              {isClientMode ? 'Заявка на согласование ввоза товаров' : 'Создание новой поставки Wildberries'}
+              {isClientMode ? (
+                <>
+                  <PackagePlus color="#8b5cf6" size={24} />
+                  <span>Заявка на согласование ввоза товаров</span>
+                </>
+              ) : (
+                <>
+                  <Building2 color="#3b82f6" size={24} />
+                  <span>Регистрация поставки складом (Менеджер)</span>
+                </>
+              )}
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
               {isClientMode
-                ? 'Заполните заявку на слот приёмки. После одобрения менеджером склада вы получите подтверждение ворот.'
-                : 'Определите контрагента, номер задания, склады назначения WB и плановый объем'}
+                ? 'Заполните заявку на слот приёмки. После одобрения менеджером склада вам будет назначен номер ворот.'
+                : 'Прямой запуск поставки в график приёмки (по накладной из чата, самопривозу или из складских запасов)'}
             </p>
           </div>
           <button type="button" className="btn-secondary" onClick={onClose} style={{ padding: '0.4rem' }}>
@@ -219,6 +233,60 @@ export const NewShipmentModal: React.FC<Props> = ({
         )}
 
         <form onSubmit={handleSubmit}>
+          {/* Section 0 (Manager Only): Launch Scenario */}
+          {!isClientMode && (
+            <div style={{ marginBottom: '1.25rem', background: 'rgba(30, 41, 59, 0.5)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '0.85rem' }}>
+              <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                Сценарий запуска поставки менеджером:
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                <button
+                  type="button"
+                  onClick={() => setManagerLaunchMode('approved')}
+                  style={{
+                    padding: '0.6rem 0.75rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: managerLaunchMode === 'approved' ? '2px solid #10b981' : '1px solid var(--border)',
+                    background: managerLaunchMode === 'approved' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(15, 23, 42, 0.5)',
+                    color: managerLaunchMode === 'approved' ? '#34d399' : 'var(--text-muted)',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.2rem'
+                  }}
+                >
+                  <b style={{ fontSize: '0.85rem', color: managerLaunchMode === 'approved' ? '#10b981' : 'var(--text-main)' }}>
+                    ✅ 1. Слот подтверждён (Ждём авто)
+                  </b>
+                  <span style={{ fontSize: '0.73rem', opacity: 0.85 }}>Поставка внесена в график приёмки на дату</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setManagerLaunchMode('receiving')}
+                  style={{
+                    padding: '0.6rem 0.75rem',
+                    borderRadius: 'var(--radius-sm)',
+                    border: managerLaunchMode === 'receiving' ? '2px solid #f59e0b' : '1px solid var(--border)',
+                    background: managerLaunchMode === 'receiving' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(15, 23, 42, 0.5)',
+                    color: managerLaunchMode === 'receiving' ? '#fbbf24' : 'var(--text-muted)',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.2rem'
+                  }}
+                >
+                  <b style={{ fontSize: '0.85rem', color: managerLaunchMode === 'receiving' ? '#f59e0b' : 'var(--text-main)' }}>
+                    🟡 2. Товар у ворот / Самопривоз
+                  </b>
+                  <span style={{ fontSize: '0.73rem', opacity: 0.85 }}>Сразу открыть приёмку операторам по ТСД</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Section 1: Client and Shipment Metadata */}
           <div style={{ display: 'grid', gridTemplateColumns: forcedClientId ? '1fr 1.2fr' : '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
             {/* Client Selection / Display */}
@@ -279,32 +347,75 @@ export const NewShipmentModal: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* Section 1.5: Inbound Slot & Delivery Date */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1rem', marginBottom: '1rem' }}>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Желаемая дата привоза *</label>
-              <input
-                type="date"
-                className="form-input"
-                value={plannedDeliveryDate}
-                onChange={(e) => setPlannedDeliveryDate(e.target.value)}
-                required
-                style={{ paddingLeft: '0.75rem' }}
-              />
-            </div>
+          {/* Section 1.5: Inbound Slot & Gate Settings */}
+          {isClientMode ? (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Желаемая дата привоза на склад *</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={plannedDeliveryDate}
+                  onChange={(e) => setPlannedDeliveryDate(e.target.value)}
+                  required
+                  style={{ paddingLeft: '0.75rem' }}
+                />
+              </div>
 
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Перевозчик / Авто / Водитель (опционально)</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Например: Газель У777МР777, водитель Марат"
-                value={driverInfo}
-                onChange={(e) => setDriverInfo(e.target.value)}
-                style={{ paddingLeft: '0.75rem' }}
-              />
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Перевозчик / Авто / Водитель (опционально)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Например: Газель У777МР777, водитель Марат"
+                  value={driverInfo}
+                  onChange={(e) => setDriverInfo(e.target.value)}
+                  style={{ paddingLeft: '0.75rem' }}
+                />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.5fr', gap: '0.75rem', marginBottom: '1rem' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Дата слота приёмки *</label>
+                <input
+                  type="date"
+                  className="form-input"
+                  value={plannedDeliveryDate}
+                  onChange={(e) => setPlannedDeliveryDate(e.target.value)}
+                  required
+                  style={{ paddingLeft: '0.75rem' }}
+                />
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Назначить ворота склада</label>
+                <select
+                  className="form-input"
+                  value={assignedGate}
+                  onChange={(e) => setAssignedGate(e.target.value)}
+                  style={{ paddingLeft: '0.75rem' }}
+                >
+                  <option value="Ворота № 1 (Рампа)">Ворота № 1 (Рампа)</option>
+                  <option value="Ворота № 2 (Малый тоннаж)">Ворота № 2 (Малый тоннаж)</option>
+                  <option value="Ворота № 3 (Паллетная зона)">Ворота № 3 (Паллетная зона)</option>
+                  <option value="Сектор B (Складской запас)">Сектор B (Складской запас)</option>
+                </select>
+              </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Данные авто / ТТН (опционально)</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Водитель, номер авто или ТТН"
+                  value={driverInfo}
+                  onChange={(e) => setDriverInfo(e.target.value)}
+                  style={{ paddingLeft: '0.75rem' }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Section 2: Target WB Warehouses */}
           <div className="form-group" style={{ marginBottom: '1.25rem' }}>
@@ -499,13 +610,28 @@ export const NewShipmentModal: React.FC<Props> = ({
             <button type="button" className="btn-secondary" onClick={onClose} disabled={isSubmitting}>
               Отмена
             </button>
-            <button type="submit" className="btn-primary" disabled={isSubmitting} style={{ width: 'auto' }}>
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={isSubmitting}
+              style={{
+                width: 'auto',
+                background: isClientMode
+                  ? 'linear-gradient(135deg, #8b5cf6, #6366f1)'
+                  : managerLaunchMode === 'receiving'
+                  ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                  : 'linear-gradient(135deg, #10b981, #059669)',
+                borderColor: 'transparent'
+              }}
+            >
               <CheckCircle2 size={16} />
               {isSubmitting
-                ? 'Создание...'
-                : plannedItems.length > 0
-                ? `Создать поставку (${totalPlannedQuantity} шт.)`
-                : 'Создать пустую поставку'}
+                ? 'Сохранение...'
+                : isClientMode
+                ? `📨 Отправить заявку на согласование (${totalPlannedQuantity} шт.)`
+                : managerLaunchMode === 'receiving'
+                ? `🟡 Запустить в приёмку на ТСД (${totalPlannedQuantity} шт.)`
+                : `✅ Подтвердить слот и создать (${totalPlannedQuantity} шт.)`}
             </button>
           </div>
         </form>
