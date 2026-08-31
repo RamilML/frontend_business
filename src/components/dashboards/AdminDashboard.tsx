@@ -6,7 +6,8 @@ import { ClientService } from '../../services/clientService';
 import {
   AdminService,
   TariffItem,
-  WarehouseGate
+  WarehouseGate,
+  IntegrationItem
 } from '../../services/adminService';
 import {
   ShieldAlert,
@@ -34,7 +35,13 @@ import {
   Truck,
   FileText,
   Save,
-  X
+  X,
+  Radio,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Activity,
+  AlertCircle
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -45,6 +52,7 @@ export const AdminDashboard: React.FC = () => {
   const [tariffs, setTariffs] = useState<TariffItem[]>([]);
   const [requisites, setRequisites] = useState<ActExecutorRequisites>(AdminService.getRequisites());
   const [gates, setGates] = useState<WarehouseGate[]>([]);
+  const [integrations, setIntegrations] = useState<IntegrationItem[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
 
   // Search & Filters
@@ -89,6 +97,14 @@ export const AdminDashboard: React.FC = () => {
     description: ''
   });
 
+  // Integration Config Modal
+  const [isIntegrationModalOpen, setIsIntegrationModalOpen] = useState(false);
+  const [editingIntegration, setEditingIntegration] = useState<IntegrationItem | null>(null);
+  const [isCreatingIntegration, setIsCreatingIntegration] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [isTestingPing, setIsTestingPing] = useState(false);
+  const [pingResult, setPingResult] = useState<{ success: boolean; message: string } | null>(null);
+
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
   const loadData = () => {
@@ -96,6 +112,7 @@ export const AdminDashboard: React.FC = () => {
     setTariffs(AdminService.getTariffs());
     setRequisites(AdminService.getRequisites());
     setGates(AdminService.getGates());
+    setIntegrations(AdminService.getIntegrations());
     ClientService.getClients().then(setClients);
   };
 
@@ -206,6 +223,69 @@ export const AdminDashboard: React.FC = () => {
     AdminService.saveGates(updated);
     setGates(updated);
     showNotification('Статус складских ворот обновлен');
+  };
+
+  // --- Integrations Handlers ---
+  const handleOpenEditIntegration = (item: IntegrationItem) => {
+    setEditingIntegration({ ...item });
+    setIsCreatingIntegration(false);
+    setShowApiKey(false);
+    setPingResult(null);
+    setIsIntegrationModalOpen(true);
+  };
+
+  const handleOpenCreateIntegration = () => {
+    setEditingIntegration({
+      id: `int_${Date.now()}`,
+      name: '',
+      code: 'custom',
+      category: 'marketplace',
+      status: 'not_configured',
+      description: '',
+      apiKey: '',
+      apiUrl: '',
+      extraParam: '',
+      isEnabled: true
+    });
+    setIsCreatingIntegration(true);
+    setShowApiKey(true);
+    setPingResult(null);
+    setIsIntegrationModalOpen(true);
+  };
+
+  const handleTestIntegrationPing = async () => {
+    if (!editingIntegration) return;
+    setIsTestingPing(true);
+    setPingResult(null);
+    try {
+      const res = await AdminService.testIntegrationPing(editingIntegration.id);
+      setPingResult(res);
+    } catch {
+      setPingResult({ success: false, message: 'Ошибка сети / таймаут соединения' });
+    } finally {
+      setIsTestingPing(false);
+    }
+  };
+
+  const handleSaveIntegration = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingIntegration) return;
+
+    if (isCreatingIntegration) {
+      AdminService.addIntegration({
+        ...editingIntegration,
+        status: editingIntegration.apiKey?.trim() ? 'connected' : 'not_configured'
+      });
+      showNotification(`Интеграция "${editingIntegration.name}" успешно добавлена`);
+    } else {
+      AdminService.updateIntegration(editingIntegration.id, {
+        ...editingIntegration,
+        status: editingIntegration.apiKey?.trim() ? 'connected' : 'not_configured'
+      });
+      showNotification(`Настройки интеграции "${editingIntegration.name}" сохранены`);
+    }
+    setIsIntegrationModalOpen(false);
+    loadData();
   };
 
   // --- Backup Handler ---
@@ -898,7 +978,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 4: SYSTEM & WAREHOUSE */}
+        {/* TAB 4: SYSTEM & WAREHOUSE & INTEGRATIONS */}
         {activeTab === 'system' && (
           <div>
             <div style={{ marginBottom: '1.5rem' }}>
@@ -913,9 +993,11 @@ export const AdminDashboard: React.FC = () => {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem' }}>
               {/* Warehouse Gates Manager */}
               <div className="card">
-                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Warehouse size={18} color="var(--primary)" /> Складские Ворота и Рампы приёмки
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <h3 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Warehouse size={18} color="var(--primary)" /> Складские Ворота и Рампы приёмки
+                  </h3>
+                </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
                   Ворота, доступные для назначения Менеджером при согласовании слотов селлеров
                 </p>
@@ -950,6 +1032,7 @@ export const AdminDashboard: React.FC = () => {
                         style={{
                           padding: '0.3rem 0.65rem',
                           fontSize: '0.75rem',
+                          whiteSpace: 'nowrap',
                           borderColor: g.isActive ? '#10b981' : '#f43f5e',
                           color: g.isActive ? '#34d399' : '#f43f5e'
                         }}
@@ -963,43 +1046,71 @@ export const AdminDashboard: React.FC = () => {
 
               {/* Integrations & API */}
               <div className="card">
-                <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Layers size={18} color="#8b5cf6" /> Интеграции с Маркетплейсами и 1С
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <h3 className="card-title" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Layers size={18} color="#8b5cf6" /> Интеграции с Маркетплейсами и 1С
+                  </h3>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={handleOpenCreateIntegration}
+                    style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', borderColor: '#8b5cf6', color: '#c4b5fd' }}
+                  >
+                    + Добавить
+                  </button>
+                </div>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  Подключение API для сверки номенклатуры и автоматической синхронизации
+                  Подключение API для сверки номенклатуры, ШК коробов и автоматической синхронизации
                 </p>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>Wildberries Vendor API</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Сверка баркодов и сгенерированных ШК коробов</div>
-                    </div>
-                    <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid #10b981' }}>
-                      Подключено
-                    </span>
-                  </div>
+                  {integrations.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        padding: '0.75rem',
+                        background: 'rgba(15, 23, 42, 0.6)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-sm)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '0.75rem'
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{item.name}</span>
+                          {item.status === 'connected' ? (
+                            <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid #10b981', fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
+                              Подключено
+                            </span>
+                          ) : (
+                            <span className="badge" style={{ background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-muted)', fontSize: '0.7rem', padding: '0.1rem 0.4rem' }}>
+                              Не настроено
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.description}
+                        </div>
+                        {item.lastSyncAt && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--primary)', marginTop: '0.15rem' }}>
+                            Синхронизация: {item.lastSyncAt}
+                          </div>
+                        )}
+                      </div>
 
-                  <div style={{ padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>Ozon Seller API</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Подготовка этикеток FBO/FBS</div>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => handleOpenEditIntegration(item)}
+                        style={{ padding: '0.35rem 0.65rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                      >
+                        <Settings size={13} /> Настроить
+                      </button>
                     </div>
-                    <span className="badge" style={{ background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid #38bdf8' }}>
-                      Готово к настройке
-                    </span>
-                  </div>
-
-                  <div style={{ padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontWeight: 600 }}>1С:Предприятие / МойСклад</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Выгрузка бухгалтерских актов и счетов</div>
-                    </div>
-                    <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid #f59e0b' }}>
-                      Шлюз активен
-                    </span>
-                  </div>
+                  ))}
                 </div>
               </div>
 
@@ -1009,7 +1120,7 @@ export const AdminDashboard: React.FC = () => {
                   <DownloadCloud size={18} color="#10b981" /> Резервное Копирование Базы Данных (Backup)
                 </h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  Скачивание полного снапшота базы данных (пользователи, тарифы, складские зоны, реквизиты) в формате JSON
+                  Скачивание полного снапшота базы данных (пользователи, тарифы, складские зоны, реквизиты, интеграции) в формате JSON
                 </p>
 
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -1027,6 +1138,156 @@ export const AdminDashboard: React.FC = () => {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: INTEGRATION CONFIG / ADD */}
+        {isIntegrationModalOpen && editingIntegration && (
+          <div className="modal-overlay">
+            <div className="modal-content" style={{ maxWidth: 580 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Layers size={22} color="#8b5cf6" />
+                  {isCreatingIntegration ? 'Добавление новой интеграции' : `Настройка: ${editingIntegration.name}`}
+                </h3>
+                <button type="button" className="btn-secondary" onClick={() => setIsIntegrationModalOpen(false)} style={{ padding: '0.4rem' }}>
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveIntegration}>
+                {isCreatingIntegration && (
+                  <div className="form-group">
+                    <label className="form-label">Наименование интеграции / шлюза *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Например: Kaspi.kz Магазин API или Яндекс Маркет"
+                      value={editingIntegration.name}
+                      onChange={(e) => setEditingIntegration({ ...editingIntegration, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label className="form-label">
+                    API Токен / Секретный Ключ авторизации *
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      className="form-input"
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                      value={editingIntegration.apiKey || ''}
+                      onChange={(e) => setEditingIntegration({ ...editingIntegration, apiKey: e.target.value })}
+                      style={{ paddingRight: '2.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      style={{
+                        position: 'absolute',
+                        right: 8,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        padding: 4
+                      }}
+                    >
+                      {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                    Токен передается в заголовке авторизации
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Endpoint URL / Базовый адрес API</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="https://api-seller.ozon.ru / https://1c.warehouse.kg/api"
+                    value={editingIntegration.apiUrl || ''}
+                    onChange={(e) => setEditingIntegration({ ...editingIntegration, apiUrl: e.target.value })}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Дополнительный параметр (Client-ID / Chat-ID / Идентификатор)</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Client-ID: 108239 или @channel_name"
+                    value={editingIntegration.extraParam || ''}
+                    onChange={(e) => setEditingIntegration({ ...editingIntegration, extraParam: e.target.value })}
+                  />
+                </div>
+
+                {/* Connection Ping Test Box */}
+                <div
+                  style={{
+                    background: 'rgba(15, 23, 42, 0.6)',
+                    border: '1px dashed var(--border)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '0.85rem',
+                    marginBottom: '1.25rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.6rem'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                      Проверка доступности шлюза:
+                    </span>
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={handleTestIntegrationPing}
+                      disabled={isTestingPing || !editingIntegration.apiKey?.trim()}
+                      style={{ padding: '0.3rem 0.65rem', fontSize: '0.78rem', borderColor: 'var(--primary)', color: 'var(--primary)' }}
+                    >
+                      <Activity size={13} className={isTestingPing ? 'animate-spin' : ''} />
+                      {isTestingPing ? 'Проверка связи...' : '🔄 Тест API соединения'}
+                    </button>
+                  </div>
+
+                  {pingResult && (
+                    <div
+                      style={{
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: 4,
+                        fontSize: '0.8rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        background: pingResult.success ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
+                        color: pingResult.success ? '#34d399' : '#fb7185',
+                        border: `1px solid ${pingResult.success ? '#10b981' : '#f43f5e'}`
+                      }}
+                    >
+                      {pingResult.success ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+                      <span>{pingResult.message}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+                  <button type="button" className="btn-secondary" onClick={() => setIsIntegrationModalOpen(false)}>
+                    Отмена
+                  </button>
+                  <button type="submit" className="btn-primary" style={{ width: 'auto' }}>
+                    <Save size={16} /> Сохранить настройки
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

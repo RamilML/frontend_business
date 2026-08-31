@@ -6,6 +6,7 @@ const STORAGE_KEY_USERS = 'ff_assistant_admin_users';
 const STORAGE_KEY_TARIFFS = 'ff_assistant_admin_tariffs';
 const STORAGE_KEY_REQUISITES = 'ff_assistant_admin_requisites';
 const STORAGE_KEY_GATES = 'ff_assistant_admin_gates';
+const STORAGE_KEY_INTEGRATIONS = 'ff_assistant_admin_integrations';
 
 export interface TariffItem {
   id: string;
@@ -24,6 +25,21 @@ export interface WarehouseGate {
   type: 'ramp' | 'standard' | 'pallet' | 'storage';
   isActive: boolean;
   maxTruckCapacity: string;
+}
+
+export interface IntegrationItem {
+  id: string;
+  name: string;
+  code: 'wb' | 'ozon' | '1c' | 'kaspi' | 'telegram' | 'yandex' | 'custom';
+  category: 'marketplace' | 'accounting' | 'notifications';
+  status: 'connected' | 'not_configured' | 'error';
+  description: string;
+  apiKey?: string;
+  apiUrl?: string;
+  webhookUrl?: string;
+  extraParam?: string; // Client ID, Chat ID, Org ID
+  lastSyncAt?: string;
+  isEnabled: boolean;
 }
 
 export const INITIAL_USERS: User[] = [
@@ -114,6 +130,68 @@ export const INITIAL_GATES: WarehouseGate[] = [
   { id: 'g_2', name: 'Ворота № 2 (Малый тоннаж)', type: 'standard', isActive: true, maxTruckCapacity: 'Газель / Портер до 3.5т' },
   { id: 'g_3', name: 'Ворота № 3 (Паллетная зона)', type: 'pallet', isActive: true, maxTruckCapacity: 'Паллетный погрузчик' },
   { id: 'g_4', name: 'Сектор B (Складской запас)', type: 'storage', isActive: true, maxTruckCapacity: 'Внутреннее перемещение' }
+];
+
+export const INITIAL_INTEGRATIONS: IntegrationItem[] = [
+  {
+    id: 'int_1',
+    name: 'Wildberries Vendor API',
+    code: 'wb',
+    category: 'marketplace',
+    status: 'connected',
+    description: 'Сверка баркодов, валидация карточек товаров и генерация ШК поставок WB',
+    apiKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.wb_prod_sec_token_9921',
+    apiUrl: 'https://suppliers-api.wildberries.ru',
+    lastSyncAt: 'Сегодня, 11:42',
+    isEnabled: true
+  },
+  {
+    id: 'int_2',
+    name: 'Ozon Seller API',
+    code: 'ozon',
+    category: 'marketplace',
+    status: 'not_configured',
+    description: 'Подготовка этикеток FBO/FBS и выгрузка актов приёмки Ozon',
+    apiKey: '',
+    apiUrl: 'https://api-seller.ozon.ru',
+    extraParam: '',
+    isEnabled: false
+  },
+  {
+    id: 'int_3',
+    name: '1С:Предприятие / МойСклад',
+    code: '1c',
+    category: 'accounting',
+    status: 'connected',
+    description: 'Автоматическая выгрузка бухгалтерских актов и счетов в учетную систему склада',
+    apiKey: '1c_auth_bearer_98234710',
+    apiUrl: 'https://1c.warehouse-bishkek.kg/hs/fulfillment/v1',
+    lastSyncAt: 'Сегодня, 12:15',
+    isEnabled: true
+  },
+  {
+    id: 'int_4',
+    name: 'Kaspi.kz Магазин (API)',
+    code: 'kaspi',
+    category: 'marketplace',
+    status: 'not_configured',
+    description: 'Синхронизация заказов Kaspi Доставка и печать накладных',
+    apiKey: '',
+    apiUrl: 'https://kaspi.kz/merchantcabinet/api/v1',
+    isEnabled: false
+  },
+  {
+    id: 'int_5',
+    name: 'Telegram Бот Склада (Уведомления)',
+    code: 'telegram',
+    category: 'notifications',
+    status: 'connected',
+    description: 'Мгновенные push-уведомления селлерам о прибытии машин на ворота и готовности актов',
+    apiKey: 'bot7123984512:AAH9fkl23Jkl2j4l23j4lkj234lk',
+    extraParam: '@ff_warehouse_bot',
+    lastSyncAt: 'Сегодня, 12:40',
+    isEnabled: true
+  }
 ];
 
 export class AdminService {
@@ -236,6 +314,65 @@ export class AdminService {
     localStorage.setItem(STORAGE_KEY_GATES, JSON.stringify(gates));
   }
 
+  // Integrations
+  public static getIntegrations(): IntegrationItem[] {
+    const data = localStorage.getItem(STORAGE_KEY_INTEGRATIONS);
+    if (!data) {
+      localStorage.setItem(STORAGE_KEY_INTEGRATIONS, JSON.stringify(INITIAL_INTEGRATIONS));
+      return INITIAL_INTEGRATIONS;
+    }
+    try {
+      return JSON.parse(data);
+    } catch {
+      return INITIAL_INTEGRATIONS;
+    }
+  }
+
+  public static saveIntegrations(items: IntegrationItem[]): void {
+    localStorage.setItem(STORAGE_KEY_INTEGRATIONS, JSON.stringify(items));
+  }
+
+  public static updateIntegration(id: string, dto: Partial<IntegrationItem>): void {
+    const items = this.getIntegrations();
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx !== -1) {
+      items[idx] = { ...items[idx], ...dto };
+      this.saveIntegrations(items);
+    }
+  }
+
+  public static addIntegration(dto: Omit<IntegrationItem, 'id'>): IntegrationItem {
+    const items = this.getIntegrations();
+    const newItem: IntegrationItem = {
+      ...dto,
+      id: `int_${Date.now()}`
+    };
+    items.push(newItem);
+    this.saveIntegrations(items);
+    return newItem;
+  }
+
+  public static deleteIntegration(id: string): void {
+    const items = this.getIntegrations().filter((i) => i.id !== id);
+    this.saveIntegrations(items);
+  }
+
+  public static async testIntegrationPing(id: string): Promise<{ success: boolean; message: string; latencyMs: number }> {
+    // Simulate live test ping
+    await new Promise((res) => setTimeout(res, 600));
+    const items = this.getIntegrations();
+    const item = items.find((i) => i.id === id);
+    if (!item || !item.apiKey?.trim()) {
+      return { success: false, message: 'API ключ не заполнен', latencyMs: 0 };
+    }
+    const latency = Math.floor(45 + Math.random() * 80);
+    this.updateIntegration(id, {
+      status: 'connected',
+      lastSyncAt: `Сегодня, ${new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`
+    });
+    return { success: true, message: `Соединение успешно установлено (200 OK, ${latency}мс)`, latencyMs: latency };
+  }
+
   // Backup & Reset
   public static exportFullSystemBackup(): string {
     const backup = {
@@ -244,7 +381,8 @@ export class AdminService {
       users: this.getUsers(),
       tariffs: this.getTariffs(),
       requisites: this.getRequisites(),
-      gates: this.getGates()
+      gates: this.getGates(),
+      integrations: this.getIntegrations()
     };
     return JSON.stringify(backup, null, 2);
   }
