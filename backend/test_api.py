@@ -1,5 +1,6 @@
 import sys
 import os
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -62,11 +63,50 @@ def test_full_api_workflow():
     print(f"   ✅ Новый клиент создан! ID: {created_client['id']}, ИНН: {created_client['requisites']['inn']}")
 
     print("\n🔍 4. Тестирование Поставок и Сканирования ШК (/api/v1/shipments):")
+    # Проверка жизненного цикла: Создание клиентом (draft) -> Одобрение слота менеджером (approved) -> Прибытие (receiving)
+    new_shipment_req = {
+        "shipmentNumber": f"WB-SLOT-TEST-{uuid.uuid4().hex[:4]}",
+        "clientId": created_client["id"],
+        "targetWarehouses": ["Коледино", "Тула"],
+        "status": "draft",
+        "plannedDeliveryDate": "2026-09-02",
+        "driverInfo": "Газель У777МР777, водитель Марат",
+        "initialItems": [
+            {
+                "title": "Платье летнее Шелковое",
+                "barcode": "4609998881112",
+                "sku": "PL-SHK-01",
+                "plannedQuantity": 50
+            }
+        ]
+    }
+    r = client.post("/api/v1/shipments", json=new_shipment_req, headers=headers)
+    assert r.status_code == 201
+    created_shp = r.json()
+    assert created_shp["status"] == "draft"
+    assert created_shp["plannedDeliveryDate"] == "2026-09-02"
+    print(f"   ✅ Заявка клиента создана со статусом '{created_shp['status']}' и планом {created_shp['items'][0]['plannedQuantity']} шт.")
+
+    # Менеджер одобряет слот
+    r = client.post(f"/api/v1/shipments/{created_shp['id']}/approve", json={"gateNumber": "Ворота № 2", "managerComment": "Слот подтвержден на 10:00"}, headers=headers)
+    assert r.status_code == 200
+    approved_shp = r.json()
+    assert approved_shp["status"] == "approved"
+    assert approved_shp["gateNumber"] == "Ворота № 2"
+    print(f"   ✅ Менеджер одобрил заявку: статус '{approved_shp['status']}', ворота: '{approved_shp['gateNumber']}'")
+
+    # Машина прибыла на склад -> Оператор переводит в приёмку
+    r = client.post(f"/api/v1/shipments/{created_shp['id']}/start-receiving", headers=headers)
+    assert r.status_code == 200
+    receiving_shp = r.json()
+    assert receiving_shp["status"] == "receiving"
+    print(f"   ✅ Товар прибыл на склад: статус '{receiving_shp['status']}'")
+
     r = client.get("/api/v1/shipments", headers=headers)
     assert r.status_code == 200
     shipments = r.json()
     assert len(shipments) > 0
-    shipment_with_items = next((s for s in shipments if len(s["items"]) > 0), shipments[0])
+    shipment_with_items = next((s for s in shipments if len(s["items"]) > 0 and s["status"] == "receiving"), shipments[0])
     shipment_id = shipment_with_items["id"]
     test_barcode = shipment_with_items["items"][0]["barcode"] if len(shipment_with_items["items"]) > 0 else "4601234567890"
     print(f"   ✅ Список поставок OK: Поставка № {shipment_with_items['shipmentNumber']} (Склады WB: {shipment_with_items['targetWarehouses']})")
@@ -112,7 +152,6 @@ def test_full_api_workflow():
     print(f"   ✅ Реестр актов OK: Найдено {len(acts)} актов (первый: {acts[0]['actNumber']}, сумма: {acts[0]['totalSum']})")
 
     # Создание Акта
-    import uuid
     new_act_payload = {
         "actNumber": f"АКТ-TEST-{uuid.uuid4().hex[:6]}",
         "date": "2026-08-30",

@@ -146,10 +146,29 @@ export const ManagerDashboard: React.FC = () => {
     return true;
   });
 
+  const handleApproveShipment = async (shipmentId: string, gateNumber: string = 'Ворота № 1', comment?: string) => {
+    try {
+      await ShipmentService.approveShipment(shipmentId, gateNumber, comment);
+      await loadAllData();
+    } catch (err: any) {
+      alert(err?.message || 'Ошибка одобрения заявки');
+    }
+  };
+
   const getStatusBadge = (status: Shipment['status']) => {
     switch (status) {
       case 'draft':
-        return <span className="badge badge-manager" style={{ opacity: 0.85 }}>📝 Черновик</span>;
+        return (
+          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
+            ⏳ На согласовании
+          </span>
+        );
+      case 'approved':
+        return (
+          <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981' }}>
+            ✅ Одобрена складом
+          </span>
+        );
       case 'receiving':
         return <span className="badge badge-operator">🟡 В приёмке</span>;
       case 'packing':
@@ -294,6 +313,86 @@ export const ManagerDashboard: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Pending Approval Shipments Alert Block */}
+          {shipments.filter((s) => s.status === 'draft').length > 0 && (
+            <div
+              className="card"
+              style={{
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(15, 23, 42, 0.9))',
+                marginBottom: '1.5rem',
+                padding: '1.25rem'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  🔔 Заявки селлеров на согласование ввоза ({shipments.filter((s) => s.status === 'draft').length})
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                  Проверьте емкость склада и подтвердите слот приёмки
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+                {shipments.filter((s) => s.status === 'draft').map((shp) => {
+                  const plannedUnits = shp.items.reduce((sum, it) => sum + it.plannedQuantity, 0);
+
+                  return (
+                    <div
+                      key={shp.id}
+                      style={{
+                        background: 'rgba(15, 23, 42, 0.7)',
+                        border: '1px solid rgba(245, 158, 11, 0.25)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '1rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                          <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text-main)' }}>
+                            {shp.clientName}
+                          </span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'var(--primary)' }}>
+                            {shp.shipmentNumber}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                          <div>📅 Желаемая дата привоза: <b style={{ color: '#fbbf24' }}>{shp.plannedDeliveryDate ? new Date(shp.plannedDeliveryDate).toLocaleDateString('ru-RU') : 'Ближайшая'}</b></div>
+                          <div>📦 Плановый объем: <b>{shp.items.length} позиций ({plannedUnits} шт.)</b></div>
+                          <div>🚚 Целевые склады WB: <b>{shp.targetWarehouses.join(', ')}</b></div>
+                          {shp.driverInfo && <div>🚛 Перевозчик/Авто: <b>{shp.driverInfo}</b></div>}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          onClick={() => handleApproveShipment(shp.id, 'Ворота № 1')}
+                          style={{ flex: 1, padding: '0.4rem', fontSize: '0.8rem', background: '#10b981', borderColor: '#10b981' }}
+                        >
+                          <CheckCircle2 size={14} /> Одобрить (Ворота №1)
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => handleApproveShipment(shp.id, 'Ворота № 2')}
+                          style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}
+                        >
+                          Ворота №2
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Real-Time Shipments Registry Section */}
           <div className="card">

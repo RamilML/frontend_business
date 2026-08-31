@@ -45,7 +45,11 @@ class ShipmentCreate(BaseModel):
     shipmentNumber: str
     clientId: str
     targetWarehouses: List[str]
-    status: Optional[str] = "receiving"
+    status: Optional[str] = "draft"
+    plannedDeliveryDate: Optional[str] = None
+    driverInfo: Optional[str] = None
+    gateNumber: Optional[str] = None
+    managerComment: Optional[str] = None
     initialItems: Optional[List[ShipmentItemBase]] = []
 
 class ShipmentUpdate(BaseModel):
@@ -54,8 +58,17 @@ class ShipmentUpdate(BaseModel):
     clientName: Optional[str] = None
     targetWarehouses: Optional[List[str]] = None
     status: Optional[str] = None
+    plannedDeliveryDate: Optional[str] = None
+    driverInfo: Optional[str] = None
+    gateNumber: Optional[str] = None
+    managerComment: Optional[str] = None
     operatorId: Optional[str] = None
     operatorName: Optional[str] = None
+
+class ApproveShipmentRequest(BaseModel):
+    gateNumber: Optional[str] = "Ворота № 1"
+    managerComment: Optional[str] = None
+    plannedDeliveryDate: Optional[str] = None
 
 class ShipmentResponse(BaseModel):
     id: str
@@ -64,6 +77,10 @@ class ShipmentResponse(BaseModel):
     clientName: str
     targetWarehouses: List[str]
     status: str
+    plannedDeliveryDate: Optional[str] = None
+    driverInfo: Optional[str] = None
+    gateNumber: Optional[str] = None
+    managerComment: Optional[str] = None
     operatorId: Optional[str] = None
     operatorName: Optional[str] = None
     items: List[ShipmentItemResponse] = []

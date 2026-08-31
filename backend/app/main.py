@@ -14,14 +14,20 @@ Base.metadata.create_all(bind=engine)
 
 # Безопасная автомиграция колонок SQLite
 with engine.connect() as conn:
-    try:
-        conn.execute(text("ALTER TABLE packing_boxes ADD COLUMN is_packed BOOLEAN DEFAULT 0"))
-    except Exception:
-        pass
-    try:
-        conn.execute(text("ALTER TABLE packing_boxes ADD COLUMN sealed_at DATETIME"))
-    except Exception:
-        pass
+    for col, col_type in [
+        ("is_packed", "BOOLEAN DEFAULT 0"),
+        ("sealed_at", "DATETIME")
+    ]:
+        try:
+            conn.execute(text(f"ALTER TABLE packing_boxes ADD COLUMN {col} {col_type}"))
+        except Exception:
+            pass
+
+    for col in ["planned_delivery_date", "driver_info", "gate_number", "manager_comment"]:
+        try:
+            conn.execute(text(f"ALTER TABLE shipments ADD COLUMN {col} TEXT"))
+        except Exception:
+            pass
     conn.commit()
 
 def init_db():

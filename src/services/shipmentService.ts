@@ -261,6 +261,94 @@ export class ShipmentService {
     this.saveStoredShipments(filtered);
     return true;
   }
+
+  /**
+   * Согласование слота и одобрение ввоза менеджером
+   */
+  public static async approveShipment(
+    id: string,
+    gateNumber: string = 'Ворота № 1',
+    managerComment?: string,
+    plannedDeliveryDate?: string
+  ): Promise<Shipment> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${id}/approve`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ gateNumber, managerComment, plannedDeliveryDate })
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          const list = this.loadStoredShipments();
+          const idx = list.findIndex((s) => s.id === id);
+          if (idx !== -1) {
+            list[idx] = { ...list[idx], ...updated };
+            this.saveStoredShipments(list);
+          }
+          return updated;
+        }
+      } catch (e) {
+        console.warn('Approve shipment server call failed:', e);
+      }
+    }
+
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === id);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    shipment.status = 'approved';
+    shipment.gateNumber = gateNumber;
+    if (managerComment) shipment.managerComment = managerComment;
+    if (plannedDeliveryDate) shipment.plannedDeliveryDate = plannedDeliveryDate;
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+    return shipment;
+  }
+
+  /**
+   * Фиксация прибытия машины на ворота и запуск приёмки оператором
+   */
+  public static async startReceivingShipment(id: string): Promise<Shipment> {
+    const config = AuthService.getConfig();
+
+    if (!config.useMock) {
+      try {
+        const token = AuthService.getStoredToken();
+        const res = await fetch(`${config.baseUrl}/shipments/${id}/start-receiving`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const updated = await res.json();
+          const list = this.loadStoredShipments();
+          const idx = list.findIndex((s) => s.id === id);
+          if (idx !== -1) {
+            list[idx] = { ...list[idx], ...updated };
+            this.saveStoredShipments(list);
+          }
+          return updated;
+        }
+      } catch (e) {
+        console.warn('Start receiving server call failed:', e);
+      }
+    }
+
+    const list = this.loadStoredShipments();
+    const shipment = list.find((s) => s.id === id);
+    if (!shipment) throw new Error('Поставка не найдена');
+
+    shipment.status = 'receiving';
+    shipment.updatedAt = new Date().toISOString();
+    this.saveStoredShipments(list);
+    return shipment;
+  }
   public static async processBarcodeScan(shipmentId: string, barcode: string): Promise<ScanResult> {
     const cleanBarcode = barcode.trim();
     if (!cleanBarcode) {

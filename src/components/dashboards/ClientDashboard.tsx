@@ -72,7 +72,17 @@ export const ClientDashboard: React.FC = () => {
   const getStatusBadge = (status: Shipment['status']) => {
     switch (status) {
       case 'draft':
-        return <span className="badge badge-manager" style={{ opacity: 0.85 }}>📝 Черновик</span>;
+        return (
+          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
+            ⏳ На согласовании слота
+          </span>
+        );
+      case 'approved':
+        return (
+          <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981' }}>
+            ✅ Слот одобрен складом
+          </span>
+        );
       case 'receiving':
         return <span className="badge badge-operator">🟡 В приёмке</span>;
       case 'packing':
@@ -192,10 +202,28 @@ export const ClientDashboard: React.FC = () => {
                     {getStatusBadge(shp.status)}
                   </div>
 
+                  {/* Slotting status indicator */}
+                  {shp.status === 'draft' && (
+                    <div style={{ background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.65rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: '#fbbf24' }}>
+                      ⏳ Заявка ожидает согласования слота складом на <b>{shp.plannedDeliveryDate ? new Date(shp.plannedDeliveryDate).toLocaleDateString('ru-RU') : 'ближайшую дату'}</b>. Ожидайте подтверждения ворот.
+                    </div>
+                  )}
+
+                  {shp.status === 'approved' && (
+                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 'var(--radius-sm)', padding: '0.5rem 0.65rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: '#34d399' }}>
+                      ✅ Слот одобрен! Привоз: <b>{shp.plannedDeliveryDate ? new Date(shp.plannedDeliveryDate).toLocaleDateString('ru-RU') : 'согласован'}</b>. Назначены: <b>{shp.gateNumber || 'Ворота № 1'}</b>. Можно отправлять машину!
+                    </div>
+                  )}
+
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <Truck size={14} color="#93c5fd" /> Склады WB: <b>{shp.targetWarehouses.join(', ')}</b>
                     </div>
+                    {shp.driverInfo && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
+                        <span>🚛 Авто:</span> <b>{shp.driverInfo}</b>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.2rem' }}>
                       <Box size={14} color="#10b981" /> Упаковано коробок: <b>{shp.boxes.length} шт.</b>
                     </div>

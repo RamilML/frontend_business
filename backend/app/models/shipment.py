@@ -13,7 +13,11 @@ class ShipmentModel(Base):
     client_id = Column(String, nullable=False, index=True)
     client_name = Column(String, nullable=False)
     target_warehouses = Column(JSON, default=list) # e.g. ["Коледино", "Тула"]
-    status = Column(String, default="receiving") # draft, receiving, packing, completed, shipped, ready_to_ship
+    status = Column(String, default="draft") # draft (на согласовании), approved (одобрена), receiving (в приемке), packing, ready_to_ship, shipped, completed
+    planned_delivery_date = Column(String, nullable=True) # e.g. "2026-09-02"
+    driver_info = Column(String, nullable=True) # e.g. "Газель У777МР777, водитель Марат"
+    gate_number = Column(String, nullable=True) # e.g. "Ворота № 2"
+    manager_comment = Column(String, nullable=True) # e.g. "Слот согласован на 10:00"
     operator_id = Column(String, nullable=True)
     operator_name = Column(String, nullable=True)
     

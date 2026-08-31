@@ -107,6 +107,16 @@ export const OperatorDashboard: React.FC = () => {
     }
   };
 
+  const handleStartReceiving = async (shipmentId: string) => {
+    try {
+      await ShipmentService.startReceivingShipment(shipmentId);
+      await loadShipments();
+      setActiveShipmentId(shipmentId);
+    } catch (err: any) {
+      alert(err?.message || 'Ошибка запуска приёмки');
+    }
+  };
+
   if (activeShipmentId) {
     return (
       <BarcodeScanScreen
@@ -121,6 +131,18 @@ export const OperatorDashboard: React.FC = () => {
 
   const getStatusBadge = (status: Shipment['status']) => {
     switch (status) {
+      case 'draft':
+        return (
+          <span className="badge" style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
+            ⏳ На согласовании
+          </span>
+        );
+      case 'approved':
+        return (
+          <span className="badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid #10b981' }}>
+            ✅ Одобрена складом
+          </span>
+        );
       case 'receiving':
         return <span className="badge badge-operator">🟡 В приёмке</span>;
       case 'packing':
@@ -340,13 +362,51 @@ export const OperatorDashboard: React.FC = () => {
                         );
                       }
 
+                      if (shp.status === 'draft') {
+                        return (
+                          <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: 'var(--radius-sm)', padding: '0.55rem', fontSize: '0.8rem', color: '#fbbf24', textAlign: 'center' }}>
+                            ⏳ Заявка ожидает согласования слота менеджером
+                          </div>
+                        );
+                      }
+
+                      if (shp.status === 'approved') {
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                            <div style={{ fontSize: '0.78rem', color: '#34d399', background: 'rgba(16, 185, 129, 0.1)', padding: '0.35rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(16, 185, 129, 0.25)', textAlign: 'center' }}>
+                              📅 Слот: <b>{shp.plannedDeliveryDate ? new Date(shp.plannedDeliveryDate).toLocaleDateString('ru-RU') : 'Сегодня'}</b> | <b>{shp.gateNumber || 'Ворота №1'}</b>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn-primary"
+                              onClick={() => handleStartReceiving(shp.id)}
+                              style={{ width: '100%', background: '#10b981', borderColor: '#10b981', color: '#fff', padding: '0.65rem' }}
+                            >
+                              <Truck size={16} /> 🚚 Машина прибыла → Начать приёмку
+                            </button>
+                          </div>
+                        );
+                      }
+
+                      if (shp.status === 'packing') {
+                        return (
+                          <button
+                            className="btn-primary"
+                            onClick={() => setActiveShipmentId(shp.id)}
+                            style={{ width: '100%', background: 'linear-gradient(135deg, #8b5cf6, #6366f1)' }}
+                          >
+                            <Box size={16} /> 📦 Упаковка в коробки
+                          </button>
+                        );
+                      }
+
                       return (
                         <button
                           className="btn-primary"
                           onClick={() => setActiveShipmentId(shp.id)}
                           style={{ width: '100%' }}
                         >
-                          <Play size={16} /> {shp.status === 'packing' ? '📦 Перейти к упаковке' : 'Начать / Продолжить сканирование'}
+                          <Play size={16} /> 📱 Сканировать ШК (Приёмка)
                         </button>
                       );
                     })()}

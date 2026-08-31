@@ -11,7 +11,7 @@ from app.schemas.shipment import (
     ShipmentCreate, ShipmentUpdate, ShipmentResponse, ShipmentItemResponse, ShipmentItemBase,
     ScanRequest, ScanResponse, UpdateItemQtyRequest, UpdateItemDetailsRequest,
     CreateBoxRequest, UpdateBoxWarehouseRequest, PackItemRequest, MoveItemRequest,
-    UpdateBoxItemQuantityRequest, PackingBoxSchema, BoxItemSchema, CatalogProductSchema
+    UpdateBoxItemQuantityRequest, ApproveShipmentRequest, PackingBoxSchema, BoxItemSchema, CatalogProductSchema
 )
 
 router = APIRouter(prefix="/shipments", tags=["Shipments"])
@@ -59,6 +59,10 @@ def format_shipment_response(s: ShipmentModel) -> ShipmentResponse:
         clientName=s.client_name,
         targetWarehouses=s.target_warehouses or [],
         status=s.status,
+        plannedDeliveryDate=s.planned_delivery_date,
+        driverInfo=s.driver_info,
+        gateNumber=s.gate_number,
+        managerComment=s.manager_comment,
         operatorId=s.operator_id,
         operatorName=s.operator_name,
         items=items_resp,
@@ -98,11 +102,50 @@ def update_shipment(id: str, dto: ShipmentUpdate = Body(...), db: Session = Depe
         shipment.target_warehouses = dto.targetWarehouses
     if dto.status is not None and dto.status.strip():
         shipment.status = dto.status.strip()
+    if dto.plannedDeliveryDate is not None:
+        shipment.planned_delivery_date = dto.plannedDeliveryDate
+    if dto.driverInfo is not None:
+        shipment.driver_info = dto.driverInfo
+    if dto.gateNumber is not None:
+        shipment.gate_number = dto.gateNumber
+    if dto.managerComment is not None:
+        shipment.manager_comment = dto.managerComment
     if dto.operatorId is not None:
         shipment.operator_id = dto.operatorId
     if dto.operatorName is not None:
         shipment.operator_name = dto.operatorName
 
+    shipment.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(shipment)
+    return format_shipment_response(shipment)
+
+@router.post("/{id}/approve", response_model=ShipmentResponse)
+def approve_shipment(id: str, req: ApproveShipmentRequest = Body(...), db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    shipment.status = "approved"
+    if req.gateNumber:
+        shipment.gate_number = req.gateNumber
+    if req.managerComment:
+        shipment.manager_comment = req.managerComment
+    if req.plannedDeliveryDate:
+        shipment.planned_delivery_date = req.plannedDeliveryDate
+
+    shipment.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(shipment)
+    return format_shipment_response(shipment)
+
+@router.post("/{id}/start-receiving", response_model=ShipmentResponse)
+def start_receiving_shipment(id: str, db: Session = Depends(get_db)):
+    shipment = db.query(ShipmentModel).filter(ShipmentModel.id == id).first()
+    if not shipment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Поставка не найдена")
+
+    shipment.status = "receiving"
     shipment.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(shipment)
@@ -128,7 +171,11 @@ def create_shipment(dto: ShipmentCreate = Body(...), db: Session = Depends(get_d
         client_id=dto.clientId,
         client_name=client_name,
         target_warehouses=dto.targetWarehouses,
-        status=dto.status or "receiving"
+        status=dto.status or "draft",
+        planned_delivery_date=dto.plannedDeliveryDate,
+        driver_info=dto.driverInfo,
+        gate_number=dto.gateNumber,
+        manager_comment=dto.managerComment
     )
     db.add(shipment)
     db.flush()

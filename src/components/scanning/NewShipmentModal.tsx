@@ -48,6 +48,9 @@ export const NewShipmentModal: React.FC<Props> = ({
   const [clients, setClients] = useState<Client[]>([]);
   const [selectedClientId, setSelectedClientId] = useState(forcedClientId || '');
   const [shipmentNumber, setShipmentNumber] = useState('');
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const [plannedDeliveryDate, setPlannedDeliveryDate] = useState(tomorrow);
+  const [driverInfo, setDriverInfo] = useState('');
   const [selectedWarehouses, setSelectedWarehouses] = useState<WBWarehouse[]>(['Коледино']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -173,7 +176,9 @@ export const NewShipmentModal: React.FC<Props> = ({
         shipmentNumber: shipmentNumber.trim(),
         clientId: finalClientId,
         targetWarehouses: selectedWarehouses,
-        status: 'receiving',
+        status: isClientMode ? 'draft' : 'receiving',
+        plannedDeliveryDate,
+        driverInfo: driverInfo.trim() || undefined,
         initialItems: plannedItems
       };
 
@@ -194,11 +199,11 @@ export const NewShipmentModal: React.FC<Props> = ({
           <div>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <PackagePlus color="var(--primary)" size={24} />
-              {isClientMode ? 'Создание заявки на поставку товаров' : 'Создание новой поставки Wildberries'}
+              {isClientMode ? 'Заявка на согласование ввоза товаров' : 'Создание новой поставки Wildberries'}
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
               {isClientMode
-                ? 'Укажите номер поставки, целевые склады WB и плановый состав товаров для приемки на складе'
+                ? 'Заполните заявку на слот приёмки. После одобрения менеджером склада вы получите подтверждение ворот.'
                 : 'Определите контрагента, номер задания, склады назначения WB и плановый объем'}
             </p>
           </div>
@@ -270,6 +275,33 @@ export const NewShipmentModal: React.FC<Props> = ({
                 placeholder="WB-20260831-01"
                 style={{ paddingLeft: '0.75rem' }}
                 required
+              />
+            </div>
+          </div>
+
+          {/* Section 1.5: Inbound Slot & Delivery Date */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Желаемая дата привоза *</label>
+              <input
+                type="date"
+                className="form-input"
+                value={plannedDeliveryDate}
+                onChange={(e) => setPlannedDeliveryDate(e.target.value)}
+                required
+                style={{ paddingLeft: '0.75rem' }}
+              />
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">Перевозчик / Авто / Водитель (опционально)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Например: Газель У777МР777, водитель Марат"
+                value={driverInfo}
+                onChange={(e) => setDriverInfo(e.target.value)}
+                style={{ paddingLeft: '0.75rem' }}
               />
             </div>
           </div>

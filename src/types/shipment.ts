@@ -46,7 +46,7 @@ export interface PackingBox {
   }[];
 }
 
-export type ShipmentStatus = 'draft' | 'receiving' | 'packing' | 'ready_to_ship' | 'completed' | 'shipped';
+export type ShipmentStatus = 'draft' | 'approved' | 'receiving' | 'packing' | 'ready_to_ship' | 'completed' | 'shipped';
 
 export interface Shipment {
   id: string;
@@ -55,6 +55,10 @@ export interface Shipment {
   clientName: string;
   targetWarehouses: WBWarehouse[];
   status: ShipmentStatus;
+  plannedDeliveryDate?: string;
+  driverInfo?: string;
+  gateNumber?: string;
+  managerComment?: string;
   items: ShipmentItem[];
   boxes: PackingBox[];
   createdAt: string;
@@ -68,6 +72,10 @@ export interface CreateShipmentDto {
   clientId: string;
   targetWarehouses: WBWarehouse[];
   status?: ShipmentStatus;
+  plannedDeliveryDate?: string;
+  driverInfo?: string;
+  gateNumber?: string;
+  managerComment?: string;
   initialItems?: Omit<ShipmentItem, 'id' | 'scannedQuantity'>[];
 }
 
