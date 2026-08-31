@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Client, CreateClientDto } from '../../types/client';
 import { ClientService } from '../../services/clientService';
+import { ShipmentService } from '../../services/shipmentService';
+import { ActService } from '../../services/actService';
+import { Shipment } from '../../types/shipment';
+import { Act } from '../../types/act';
 import { ClientCardModal } from './ClientCardModal';
 import {
   Users,
@@ -15,6 +19,7 @@ import {
   CreditCard,
   CheckCircle2,
   FileText,
+  TrendingUp,
   Loader2
 } from 'lucide-react';
 
@@ -24,6 +29,8 @@ interface Props {
 
 export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
   const [clients, setClients] = useState<Client[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [acts, setActs] = useState<Act[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,22 +39,32 @@ export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
-  const fetchClients = async () => {
+  const fetchAllData = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await ClientService.getClients(searchQuery);
-      setClients(data);
+      const [clientsData, shipmentsData, actsData] = await Promise.all([
+        ClientService.getClients(searchQuery),
+        ShipmentService.getShipments(),
+        ActService.getActs()
+      ]);
+      setClients(clientsData);
+      setShipments(shipmentsData);
+      setActs(actsData);
     } catch (err: any) {
-      setError(err.message || 'Не удалось загрузить клиентов');
+      setError(err.message || 'Не удалось загрузить данные');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchClients();
+    fetchAllData();
   }, [searchQuery]);
+
+  const activeShipments = shipments.filter((s) => s.status !== 'completed');
+  const readyOrShippedCount = shipments.filter((s) => s.status === 'ready_to_ship' || s.status === 'shipped').length;
+  const totalRevenue = acts.reduce((acc, a) => acc + (a.totalSum || 0), 0);
 
   const handleCreateNew = () => {
     setEditingClient(null);
@@ -63,7 +80,7 @@ export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
     if (window.confirm(`Вы действительно хотите удалить контрагента "${client.name}"?`)) {
       try {
         await ClientService.deleteClient(client.id);
-        fetchClients();
+        fetchAllData();
       } catch (err: any) {
         alert(err.message || 'Ошибка при удалении клиента');
       }
@@ -76,7 +93,7 @@ export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
     } else {
       await ClientService.createClient(dto);
     }
-    fetchClients();
+    fetchAllData();
   };
 
   return (
@@ -97,24 +114,32 @@ export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
         </button>
       </div>
 
-      {/* Top Stats Cards */}
+      {/* Top Stats Cards (Identical to Manager Dashboard) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
         <div className="card" style={{ marginBottom: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-            <span>Всего клиентов</span>
-            <Building2 size={20} color="#3b82f6" />
+            <span>Активных поставщиков</span>
+            <Users size={20} color="#3b82f6" />
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>{clients.length}</div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+            {clients.length} контрагентов
+          </div>
+          <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
+            В базе: {clients.length} компаний
+          </span>
         </div>
 
         <div className="card" style={{ marginBottom: 0 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
-            <span>Активных поставок</span>
-            <PackagePlus size={20} color="var(--primary)" />
+            <span>Поставок в работе склада</span>
+            <TrendingUp size={20} color="var(--primary)" />
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>
-            {clients.reduce((acc, c) => acc + (c.activeShipmentsCount || 0), 0)}
+          <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+            {activeShipments.length} в работе
           </div>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            {readyOrShippedCount} готовы к расчету
+          </span>
         </div>
 
         <div className="card" style={{ marginBottom: 0 }}>
@@ -122,9 +147,12 @@ export const ClientList: React.FC<Props> = ({ onSelectClientForShipment }) => {
             <span>Сформировано Актов</span>
             <FileText size={20} color="#10b981" />
           </div>
-          <div style={{ fontSize: '1.5rem', fontWeight: 700, marginTop: '0.4rem' }}>
-            {clients.reduce((acc, c) => acc + (c.totalActsCount || 0), 0)}
+          <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+            {acts.length} актов
           </div>
+          <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>
+            {totalRevenue.toLocaleString()} сом/руб. выручки
+          </span>
         </div>
       </div>
 

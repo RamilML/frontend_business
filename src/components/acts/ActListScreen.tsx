@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Act } from '../../types/act';
 import { ActService } from '../../services/actService';
 import { ActGeneratorScreen } from './ActGeneratorScreen';
-import { FileText, PlusCircle, Search, Printer, Edit, Trash2, Building2, CheckCircle2 } from 'lucide-react';
+import { FileText, PlusCircle, Search, Printer, Edit, Trash2, Building2, CheckCircle2, TrendingUp, Users } from 'lucide-react';
 
 export const ActListScreen: React.FC = () => {
   const [acts, setActs] = useState<Act[]>([]);
@@ -47,6 +47,10 @@ export const ActListScreen: React.FC = () => {
     );
   }
 
+  const totalRevenue = acts.reduce((acc, a) => acc + (a.totalSum || 0), 0);
+  const avgCheck = acts.length > 0 ? Math.round(totalRevenue / acts.length) : 0;
+  const uniqueClients = new Set(acts.map((a) => a.clientName)).size;
+
   const filteredActs = acts.filter(
     (a) =>
       a.actNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -77,6 +81,48 @@ export const ActListScreen: React.FC = () => {
         <button className="btn-primary" onClick={() => setIsCreatingNew(true)} style={{ width: 'auto' }}>
           <PlusCircle size={18} /> Сформировать новый Акт
         </button>
+      </div>
+
+      {/* Top Stats Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+        <div className="card" style={{ marginBottom: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+            <span>Сформировано Актов</span>
+            <FileText size={20} color="#10b981" />
+          </div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+            {acts.length} документов
+          </div>
+          <span style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>
+            {totalRevenue.toLocaleString()} сом/руб. выручки
+          </span>
+        </div>
+
+        <div className="card" style={{ marginBottom: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+            <span>Средний чек акта</span>
+            <TrendingUp size={20} color="var(--primary)" />
+          </div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+            {avgCheck.toLocaleString()} сом/руб.
+          </div>
+          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            По всем 13 тарифам услуг
+          </span>
+        </div>
+
+        <div className="card" style={{ marginBottom: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+            <span>Охвачено контрагентов</span>
+            <Users size={20} color="#3b82f6" />
+          </div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 700, marginTop: '0.4rem' }}>
+            {uniqueClients} селлеров
+          </div>
+          <span style={{ fontSize: '0.75rem', color: 'var(--primary)' }}>
+            Получили закрывающие акты
+          </span>
+        </div>
       </div>
 
       {/* Search Bar */}
