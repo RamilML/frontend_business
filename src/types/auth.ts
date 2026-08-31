@@ -9,6 +9,9 @@ export interface User {
   avatarUrl?: string;
   clientId?: string; // Привязка к контрагенту если роль 'client'
   clientName?: string;
+  phone?: string;
+  isActive?: boolean;
+  createdAt?: string;
 }
 
 export interface LoginCredentials {
